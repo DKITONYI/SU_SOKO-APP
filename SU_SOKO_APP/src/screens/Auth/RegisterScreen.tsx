@@ -42,7 +42,10 @@ export default function RegisterScreen() {
   const [hideConfirmPassword, setHideConfirmPassword] = useState(true);
 
  const handleRegister = async () => {
-  try {
+  console.log("Register button pressed");
+  console.log("Selected role:", role);
+  console.log("Email:", email);
+    try {
     // Check for empty fields
     if (
       isEmpty(

@@ -18,7 +18,8 @@ export const registerUser = async (
   password: string,
   role: "Buyer" | "Seller"
 ) => {
-
+  console.log("registerUser called");
+  console.log("Role received:", role);
   const userCredential = await createUserWithEmailAndPassword(
     auth,
     email,

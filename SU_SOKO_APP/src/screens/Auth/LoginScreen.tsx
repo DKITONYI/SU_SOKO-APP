@@ -1,10 +1,19 @@
 import React, { useState } from "react";
+
+
+import { loginUser } from "../../services/authService";
+
+import {
+  isEmpty,
+  isStrathmoreEmail,
+} from "../../utils/validators";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
 } from "react-native";
 
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -24,11 +33,69 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
+const handleLogin = async () => {
+  try {
+    // Check empty fields
+    if (isEmpty(email, password)) {
+      Alert.alert(
+        "Missing Information",
+        "Please enter your email and password."
+      );
+      return;
+    }
 
-  const handleLogin = () => {
-    console.log("Login Pressed");
-  };
+    // Validate Strathmore email
+    if (!isStrathmoreEmail(email)) {
+      Alert.alert(
+        "Invalid Email",
+        "Please use your Strathmore University email."
+      );
+      return;
+    }
 
+    // Login
+   const { firebaseUser, profile } = await loginUser(
+  email.trim(),
+  password
+);
+
+console.log("Firebase User:", firebaseUser.uid);
+console.log("Profile:", profile);
+
+Alert.alert(
+  "Debug",
+  JSON.stringify(profile)
+);
+    // Navigate based on role
+ switch (profile?.role) {
+  case "Buyer":
+    navigation.getParent()?.navigate("Buyer" as never);
+    break;
+
+  case "Seller":
+    navigation.getParent()?.navigate("Seller" as never);
+    break;
+
+  case "Admin":
+    navigation.getParent()?.navigate("Admin" as never);
+    break;
+
+  default:
+    Alert.alert(
+      "Error",
+      "User role not recognized."
+    );
+    break;
+}
+
+  } catch (error: any) {
+    Alert.alert(
+      "Login Failed",
+      error.message
+    );
+  }
+};
+ 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
