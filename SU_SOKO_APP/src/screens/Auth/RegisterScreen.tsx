@@ -15,7 +15,15 @@ import Colors from "../../constants/Colors";
 import CustomButton from "../../components/CustomButton";
 import CustomInput from "../../components/CustomInput";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
+import { Alert } from "react-native";
 
+import { registerUser } from "../../services/authService";
+
+import {
+  isEmpty,
+  isStrathmoreEmail,
+  passwordsMatch,
+} from "../../utils/validators";
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export default function RegisterScreen() {
@@ -33,9 +41,67 @@ export default function RegisterScreen() {
   const [hidePassword, setHidePassword] = useState(true);
   const [hideConfirmPassword, setHideConfirmPassword] = useState(true);
 
-  const handleRegister = () => {
-    console.log("Register");
-  };
+ const handleRegister = async () => {
+  try {
+    // Check for empty fields
+    if (
+      isEmpty(
+        fullName,
+        email,
+        phone,
+        password,
+        confirmPassword
+      )
+    ) {
+      Alert.alert("Missing Information", "Please fill in all the fields.");
+      return;
+    }
+
+    // Validate Strathmore email
+    if (!isStrathmoreEmail(email)) {
+      Alert.alert(
+        "Invalid Email",
+        "Please use your Strathmore University email address."
+      );
+      return;
+    }
+
+    // Check passwords match
+    if (!passwordsMatch(password, confirmPassword)) {
+      Alert.alert(
+        "Password Error",
+        "Passwords do not match."
+      );
+      return;
+    }
+
+    // Register the user
+    await registerUser(
+      fullName,
+      email.trim(),
+      phone,
+      password,
+      role
+    );
+
+    Alert.alert(
+      "Success",
+      "Account created successfully!",
+      [
+        {
+          text: "OK",
+          onPress: () => navigation.navigate("Login"),
+        },
+      ]
+    );
+
+  } catch (error: any) {
+    Alert.alert(
+      "Registration Failed",
+      error.message
+    );
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
