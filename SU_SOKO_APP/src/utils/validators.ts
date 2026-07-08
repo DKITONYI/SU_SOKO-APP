@@ -1,5 +1,10 @@
 export const isStrathmoreEmail = (email: string) => {
-  return email.endsWith("@strathmore.edu");
+  const normalizedEmail = email.trim().toLowerCase();
+
+  return (
+    normalizedEmail.endsWith("@strathmore.edu") ||
+    normalizedEmail === "admin@stratmore.edu"
+  );
 };
 
 export const passwordsMatch = (

@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function currentUser() {
+      return userDoc(request.auth.uid).data;
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && currentUser().role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin')
+        && request.auth.token.email in [
+          'admin@stratmore.edu',
+          'admin@strathmore.edu'
+        ];
+    }
+
+    function isSeller() {
+      return hasRole('seller');
+    }
+
+    function sellerHasActiveSubscription() {
+      return isSeller()
+        && currentUser().subscription_status == 'active';
+    }
+
+    function validCategory(category) {
+      return category in [
+        'household_items',
+        'books',
+        'electronics',
+        'clothes',
+        'shoes',
+        'jewellery'
+      ];
+    }
+
+    function validStatus(status) {
+      return status in ['pending', 'active', 'sold', 'deleted'];
+    }
+
+    function validProductBase(data) {
+      return data.title is string
+        && data.seller_id is string
+        && validCategory(data.category)
+        && validStatus(data.status);
+    }
+
+    function createsOwnPendingProduct() {
+      return sellerHasActiveSubscription()
+        && request.resource.data.seller_id == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && validProductBase(request.resource.data);
+    }
+
+    function updatesOwnProductWithoutApproval() {
+      return sellerHasActiveSubscription()
+        && resource.data.seller_id == request.auth.uid
+        && request.resource.data.seller_id == resource.data.seller_id
+        && request.resource.data.status != 'active'
+        && !(resource.data.status == 'pending'
+          && request.resource.data.status == 'active')
+        && validProductBase(request.resource.data);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role in ['buyer', 'seller']
+        && request.resource.data.subscription_status in ['active', 'inactive'];
+      allow update: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.subscription_status == resource.data.subscription_status);
+      allow delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if signedIn()
+        && (resource.data.status == 'active'
+          || isAdmin()
+          || resource.data.seller_id == request.auth.uid);
+
+      allow create: if createsOwnPendingProduct();
+
+      allow update: if isAdmin()
+        || updatesOwnProductWithoutApproval();
+
+      allow delete: if isAdmin()
+        || (sellerHasActiveSubscription()
+          && resource.data.seller_id == request.auth.uid);
+    }
+  }
+}

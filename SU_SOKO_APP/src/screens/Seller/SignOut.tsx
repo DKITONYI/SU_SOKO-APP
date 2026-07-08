@@ -1,19 +1,19 @@
-import React from "react";
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import CustomButton from "../../components/CustomButton";
 import Colors from "../../constants/Colors";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
+import { logoutUser } from "../../services/authService";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
-type ScreenRoute = RouteProp<SellerStackParamList, "EditProduct">;
 
-export default function EditProduct() {
+export default function SellerSignOut() {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute<ScreenRoute>();
+  const [loading, setLoading] = useState(false);
   const goBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -21,6 +21,18 @@ export default function EditProduct() {
     }
 
     navigation.navigate("SellerDashboard");
+  };
+
+  const handleSignOut = async () => {
+    setLoading(true);
+
+    try {
+      await logoutUser();
+    } catch (error: any) {
+      Alert.alert("Sign Out Failed", error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,19 +43,16 @@ export default function EditProduct() {
       </TouchableOpacity>
 
       <View style={styles.card}>
-        <Text style={styles.title}>Edit Product</Text>
-        <Text style={styles.text}>
-          Product ID: {route.params?.productId ?? "Select an item from My Products"}
+        <Text style={styles.title}>Sign Out</Text>
+        <Text style={styles.message}>
+          You will be returned to the login screen.
         </Text>
 
         <CustomButton
-          title="GO TO MY PRODUCTS"
-          onPress={() => navigation.navigate("MyProducts")}
-        />
-        <CustomButton
-          title="BACK"
-          onPress={goBack}
-          color={Colors.gray}
+          title="SIGN OUT"
+          onPress={handleSignOut}
+          loading={loading}
+          color={Colors.danger}
         />
       </View>
     </SafeAreaView>
@@ -54,8 +63,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    padding: 20,
     justifyContent: "center",
+    padding: 20,
   },
   backButton: {
     alignItems: "center",
@@ -81,8 +90,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 8,
   },
-  text: {
+  message: {
     color: Colors.gray,
-    fontSize: 15,
+    fontSize: 16,
   },
 });

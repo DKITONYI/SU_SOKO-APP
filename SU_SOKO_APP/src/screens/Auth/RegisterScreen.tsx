@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 
 import { useNavigation } from "@react-navigation/native";
@@ -15,9 +16,8 @@ import Colors from "../../constants/Colors";
 import CustomButton from "../../components/CustomButton";
 import CustomInput from "../../components/CustomInput";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
-import { Alert } from "react-native";
 
-import { registerUser } from "../../services/authService";
+import { isAdminEmail, registerUser } from "../../services/authService";
 
 import {
   isEmpty,
@@ -40,13 +40,9 @@ export default function RegisterScreen() {
 
   const [hidePassword, setHidePassword] = useState(true);
   const [hideConfirmPassword, setHideConfirmPassword] = useState(true);
+  const [loading, setLoading] = useState(false);
 
- const handleRegister = async () => {
-  console.log("Register button pressed");
-  console.log("Selected role:", role);
-  console.log("Email:", email);
-    try {
-    // Check for empty fields
+  const handleRegister = async () => {
     if (
       isEmpty(
         fullName,
@@ -60,7 +56,6 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Validate Strathmore email
     if (!isStrathmoreEmail(email)) {
       Alert.alert(
         "Invalid Email",
@@ -69,7 +64,14 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Check passwords match
+    if (isAdminEmail(email)) {
+      Alert.alert(
+        "Admin Login Only",
+        "The admin account cannot be created from registration. Please use Login."
+      );
+      return;
+    }
+
     if (!passwordsMatch(password, confirmPassword)) {
       Alert.alert(
         "Password Error",
@@ -78,33 +80,25 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Register the user
-    await registerUser(
-      fullName,
-      email.trim(),
-      phone,
-      password,
-      role
-    );
+    setLoading(true);
 
-    Alert.alert(
-      "Success",
-      "Account created successfully!",
-      [
-        {
-          text: "OK",
-          onPress: () => navigation.navigate("Login"),
-        },
-      ]
-    );
-
-  } catch (error: any) {
-    Alert.alert(
-      "Registration Failed",
-      error.message
-    );
-  }
-};
+    try {
+      await registerUser(
+        fullName.trim(),
+        email.trim(),
+        phone.trim(),
+        password,
+        role
+      );
+    } catch (error: any) {
+      Alert.alert(
+        "Registration Failed",
+        error.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -221,8 +215,9 @@ export default function RegisterScreen() {
           />
 
           <CustomButton
-            title="CREATE ACCOUNT"
+            title={loading ? "CREATING ACCOUNT..." : "CREATE ACCOUNT"}
             onPress={handleRegister}
+            disabled={loading}
           />
 
           <View style={styles.footer}>

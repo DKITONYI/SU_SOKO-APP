@@ -10,30 +10,25 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import Colors from "../../constants/Colors";
-import Loading from "../../components/Loading";
 import CustomButton from "../../components/CustomButton";
+import Loading from "../../components/Loading";
+import Colors from "../../constants/Colors";
 import { auth } from "../../firebase/firebaseConfig";
-import { BuyerStackParamList } from "../../navigation/BuyerNavigator";
-import {
-  getMessagesForProduct,
-  getMyMessages,
-  sendMessage,
-} from "../../services/messageService";
+import { SellerStackParamList } from "../../navigation/SellerNavigator";
+import { getMyMessages, sendMessage } from "../../services/messageService";
 import { Message } from "../../types/marketplace";
 
-type NavigationProp = NativeStackNavigationProp<BuyerStackParamList>;
-type ScreenRoute = RouteProp<BuyerStackParamList, "Chat">;
+type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
 
-export default function ChatScreen() {
+export default function SellerMessages() {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute<ScreenRoute>();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newProductId, setNewProductId] = useState(route.params?.productId ?? "");
-  const [newReceiverId, setNewReceiverId] = useState(route.params?.sellerId ?? "");
+  const [activeMessage, setActiveMessage] = useState<Message | null>(null);
+  const [newProductId, setNewProductId] = useState("");
+  const [newReceiverId, setNewReceiverId] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
@@ -45,18 +40,14 @@ export default function ChatScreen() {
       return;
     }
 
-    navigation.navigate("Home");
+    navigation.navigate("SellerDashboard");
   };
 
   const loadMessages = async () => {
     setLoading(true);
 
     try {
-      if (route.params?.productId) {
-        setMessages(await getMessagesForProduct(route.params.productId));
-      } else {
-        setMessages(await getMyMessages());
-      }
+      setMessages(await getMyMessages());
     } catch (error: any) {
       Alert.alert("Messages Failed", error.message);
     } finally {
@@ -66,25 +57,28 @@ export default function ChatScreen() {
 
   useEffect(() => {
     loadMessages();
-  }, [route.params?.productId]);
+  }, []);
 
   const handleReply = async () => {
-    const productId = route.params?.productId;
-    const receiverId = route.params?.sellerId;
-
-    if (!productId || !receiverId) {
-      Alert.alert("Reply Unavailable", "Open a product first to message its seller.");
+    if (!activeMessage) {
       return;
     }
+
+    const currentUid = auth.currentUser?.uid;
+    const receiverId =
+      activeMessage.sender_id === currentUid
+        ? activeMessage.receiver_id
+        : activeMessage.sender_id;
 
     setSending(true);
 
     try {
-      await sendMessage(productId, receiverId, reply);
+      await sendMessage(activeMessage.product_id, receiverId, reply);
       setReply("");
+      setActiveMessage(null);
       await loadMessages();
     } catch (error: any) {
-      Alert.alert("Message Failed", error.message);
+      Alert.alert("Reply Failed", error.message);
     } finally {
       setSending(false);
     }
@@ -119,7 +113,7 @@ export default function ChatScreen() {
       <Text style={styles.title}>Messages</Text>
 
       <View style={styles.startCard}>
-        <Text style={styles.startTitle}>Start New Chat</Text>
+        <Text style={styles.replyTitle}>Start New Chat</Text>
         <TextInput
           style={styles.replyInput}
           placeholder="Product ID"
@@ -129,7 +123,7 @@ export default function ChatScreen() {
         />
         <TextInput
           style={styles.replyInput}
-          placeholder="Seller user ID"
+          placeholder="Buyer user ID"
           placeholderTextColor={Colors.gray}
           value={newReceiverId}
           onChangeText={setNewReceiverId}
@@ -141,54 +135,45 @@ export default function ChatScreen() {
           value={newMessage}
           onChangeText={setNewMessage}
         />
-        <CustomButton
-          title="START CHAT"
-          onPress={handleStartNewChat}
-          loading={sending}
-        />
+        <CustomButton title="START CHAT" onPress={handleStartNewChat} loading={sending} />
       </View>
 
-      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         {messages.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.emptyTitle}>No messages yet</Text>
-            <Text style={styles.emptyText}>Start from a product details page.</Text>
+            <Text style={styles.emptyText}>Buyer inquiries will appear here.</Text>
           </View>
         ) : (
           messages.map((message) => {
             const mine = message.sender_id === auth.currentUser?.uid;
 
             return (
-              <View
+              <TouchableOpacity
                 key={message.id}
-                style={[styles.bubble, mine ? styles.mine : styles.theirs]}
+                style={styles.card}
+                onPress={() => setActiveMessage(message)}
               >
-                <Text style={[styles.bubbleMeta, mine && styles.mineMeta]}>
-                  {mine ? "You" : "Them"}
-                </Text>
-                <Text style={[styles.bubbleText, mine && styles.mineText]}>
-                  {message.body}
-                </Text>
-              </View>
+                <Text style={styles.messageMeta}>{mine ? "You replied" : "Buyer inquiry"}</Text>
+                <Text style={styles.messageBody}>{message.body}</Text>
+                <Text style={styles.productId}>Product: {message.product_id}</Text>
+              </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
 
-      {route.params?.productId && route.params?.sellerId ? (
+      {activeMessage ? (
         <View style={styles.replyCard}>
+          <Text style={styles.replyTitle}>Reply</Text>
           <TextInput
             style={styles.replyInput}
-            placeholder="Write a reply..."
+            placeholder="Write your reply..."
             placeholderTextColor={Colors.gray}
             value={reply}
             onChangeText={setReply}
           />
-          <CustomButton
-            title="SEND"
-            onPress={handleReply}
-            loading={sending}
-          />
+          <CustomButton title="SEND REPLY" onPress={handleReply} loading={sending} />
         </View>
       ) : null}
     </SafeAreaView>
@@ -207,19 +192,14 @@ const styles = StyleSheet.create({
   backText: { color: Colors.primary, fontSize: 15, fontWeight: "bold" },
   title: { color: Colors.primary, fontSize: 28, fontWeight: "bold", marginBottom: 14 },
   startCard: { backgroundColor: Colors.white, borderRadius: 12, elevation: 3, padding: 12, marginBottom: 14 },
-  startTitle: { color: Colors.primary, fontSize: 16, fontWeight: "bold", marginBottom: 8 },
-  list: { flex: 1 },
-  card: { backgroundColor: Colors.white, borderRadius: 12, padding: 18, elevation: 3 },
+  card: { backgroundColor: Colors.white, borderRadius: 12, elevation: 3, marginBottom: 12, padding: 16 },
   emptyTitle: { color: Colors.black, fontSize: 17, fontWeight: "bold" },
   emptyText: { color: Colors.gray, marginTop: 6 },
-  bubble: { borderRadius: 12, marginBottom: 10, maxWidth: "88%", padding: 12 },
-  mine: { alignSelf: "flex-end", backgroundColor: Colors.primary },
-  theirs: { alignSelf: "flex-start", backgroundColor: Colors.white },
-  bubbleMeta: { color: Colors.gray, fontSize: 12, marginBottom: 4 },
-  bubbleText: { color: Colors.black },
-  mineMeta: { color: Colors.lightGray },
-  mineText: { color: Colors.white },
+  messageMeta: { color: Colors.primary, fontSize: 13, fontWeight: "bold" },
+  messageBody: { color: Colors.black, fontSize: 15, marginTop: 6 },
+  productId: { color: Colors.gray, fontSize: 12, marginTop: 8 },
   replyCard: { backgroundColor: Colors.white, borderRadius: 12, elevation: 3, padding: 12 },
+  replyTitle: { color: Colors.primary, fontSize: 16, fontWeight: "bold", marginBottom: 8 },
   replyInput: {
     borderColor: Colors.lightGray,
     borderRadius: 10,

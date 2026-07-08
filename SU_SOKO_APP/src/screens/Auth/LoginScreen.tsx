@@ -45,6 +45,14 @@ const getFriendlyErrorMessage = (errorCode: string) => {
   }
 };
 
+const getLoginErrorMessage = (error: any) => {
+  if (error?.code) {
+    return getFriendlyErrorMessage(error.code);
+  }
+
+  return error?.message ?? "Something went wrong. Please try again.";
+};
+
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
 
@@ -73,7 +81,7 @@ export default function LoginScreen() {
       // it will redirect automatically once Firebase confirms the session.
     } catch (error: any) {
       console.log("Login error:", error.code, error.message);
-      Alert.alert("Login Failed", getFriendlyErrorMessage(error.code));
+      Alert.alert("Login Failed", getLoginErrorMessage(error));
     } finally {
       setLoading(false);
     }
