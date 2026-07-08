@@ -8,6 +8,7 @@ import SellerProfile from "../screens/Seller/SellerProfile";
 import Subscription from "../screens/Seller/Subscription";
 import SellerSignOut from "../screens/Seller/SignOut";
 import SellerMessages from "../screens/Seller/Messages";
+import SellerSalesReport from "../screens/Seller/SalesReport";
 
 export type SellerStackParamList = {
   SellerDashboard: undefined;
@@ -16,6 +17,7 @@ export type SellerStackParamList = {
   EditProduct: { productId?: string } | undefined;
   SellerProfile: undefined;
   SellerMessages: undefined;
+  SellerSalesReport: undefined;
   Subscription: undefined;
   SellerSignOut: undefined;
 };
@@ -31,6 +33,7 @@ export default function SellerNavigator() {
       <Stack.Screen name="EditProduct" component={EditProduct} />
       <Stack.Screen name="SellerProfile" component={SellerProfile} />
       <Stack.Screen name="SellerMessages" component={SellerMessages} />
+      <Stack.Screen name="SellerSalesReport" component={SellerSalesReport} />
       <Stack.Screen name="Subscription" component={Subscription} />
       <Stack.Screen name="SellerSignOut" component={SellerSignOut} />
     </Stack.Navigator>

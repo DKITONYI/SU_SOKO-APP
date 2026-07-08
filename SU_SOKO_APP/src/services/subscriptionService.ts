@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
@@ -46,4 +47,19 @@ export const updateSellerSubscriptionStatus = async (
     subscription_status: subscriptionStatus,
     subscription_updated_at: serverTimestamp(),
   });
+};
+
+export const subscribeToSellerSubscriptions = (
+  onSellers: (sellers: User[]) => void,
+  onError: (error: Error) => void
+) => {
+  const sellersQuery = query(collection(db, "users"), where("role", "==", "seller"));
+
+  return onSnapshot(
+    sellersQuery,
+    (snapshot) => {
+      onSellers(snapshot.docs.map((sellerDoc) => sellerDoc.data() as User));
+    },
+    onError
+  );
 };

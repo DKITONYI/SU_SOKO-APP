@@ -86,6 +86,10 @@ export const registerUser = async (
     throw new Error("Admin accounts cannot be registered from the app.");
   }
 
+  if (auth.currentUser) {
+    await signOut(auth);
+  }
+
   const userCredential = await createUserWithEmailAndPassword(
     auth,
     normalizedEmail,

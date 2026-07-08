@@ -9,7 +9,7 @@ import CustomInput from "../../components/CustomInput";
 import Colors from "../../constants/Colors";
 import { usePaymentStatus } from "../../hooks/usePaymentStatus";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
-import { paySellerSubscription } from "../../services/paymentService";
+import { isMockPaymentMode, paySellerSubscription } from "../../services/paymentService";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
 
@@ -18,6 +18,10 @@ export default function Subscription() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
   const { status, failureReason } = usePaymentStatus(paymentId);
 
   const goBack = () => {
@@ -30,17 +34,25 @@ export default function Subscription() {
   };
 
   const handlePaySubscription = async () => {
+    setFeedback(null);
     setLoading(true);
 
     try {
       const payment = await paySellerSubscription(phoneNumber);
       setPaymentId(payment.paymentId);
+      setFeedback({
+        type: "info",
+        message: "Fake STK push sent successfully. Auto-confirming payment...",
+      });
       Alert.alert(
-        "M-Pesa Prompt Sent",
-        "Check your phone and enter your M-Pesa PIN. Your subscription will activate after payment confirmation."
+        isMockPaymentMode() ? "Fake STK Push Sent" : "M-Pesa Prompt Sent",
+        payment.customerMessage ||
+          "Check your phone and enter your M-Pesa PIN. Your subscription will activate after payment confirmation."
       );
     } catch (error: any) {
-      Alert.alert("Payment Failed", error.message);
+      const message = error.message ?? "Payment was not successful.";
+      setFeedback({ type: "error", message: `Subscription not successful. ${message}` });
+      Alert.alert("Subscription Not Successful", message);
     } finally {
       setLoading(false);
     }
@@ -48,17 +60,24 @@ export default function Subscription() {
 
   useEffect(() => {
     if (status === "paid") {
+      setFeedback({
+        type: "success",
+        message: "Subscription successful. Your seller account is now active.",
+      });
       Alert.alert(
-        "Subscription Activated",
-        "Payment received. Your seller subscription is now active."
+        "Subscription Successful",
+        "Your seller account is now active."
       );
       setPaymentId(null);
     }
 
     if (status === "failed") {
+      const message =
+        failureReason || "The M-Pesa payment was cancelled or failed.";
+      setFeedback({ type: "error", message: `Subscription not successful. ${message}` });
       Alert.alert(
-        "Payment Failed",
-        failureReason || "The M-Pesa payment was cancelled or failed."
+        "Subscription Not Successful",
+        message
       );
       setPaymentId(null);
     }
@@ -80,7 +99,9 @@ export default function Subscription() {
         <Text style={styles.amount}>KES 500</Text>
         {status === "stk_sent" ? (
           <Text style={styles.statusText}>
-            Waiting for M-Pesa confirmation...
+            {isMockPaymentMode()
+              ? "Fake STK sent. Auto-confirming payment..."
+              : "Waiting for M-Pesa confirmation..."}
           </Text>
         ) : null}
 
@@ -98,6 +119,19 @@ export default function Subscription() {
           onPress={handlePaySubscription}
           loading={loading}
         />
+
+        {feedback ? (
+          <Text
+            style={[
+              styles.feedback,
+              feedback.type === "success" && styles.successFeedback,
+              feedback.type === "error" && styles.errorFeedback,
+              feedback.type === "info" && styles.infoFeedback,
+            ]}
+          >
+            {feedback.message}
+          </Text>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -155,5 +189,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
+  },
+  feedback: {
+    borderRadius: 8,
+    fontWeight: "700",
+    marginTop: 12,
+    padding: 10,
+    textAlign: "center",
+  },
+  successFeedback: {
+    backgroundColor: "#E8F8EF",
+    color: Colors.success,
+  },
+  errorFeedback: {
+    backgroundColor: "#FDECEC",
+    color: Colors.danger,
+  },
+  infoFeedback: {
+    backgroundColor: "#EEF4FF",
+    color: Colors.primary,
   },
 });

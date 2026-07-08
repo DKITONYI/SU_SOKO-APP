@@ -23,7 +23,7 @@ import { usePaymentStatus } from "../../hooks/usePaymentStatus";
 import { BuyerStackParamList } from "../../navigation/BuyerNavigator";
 import { getProductById, SellerProduct } from "../../services/productService";
 import { sendMessage } from "../../services/messageService";
-import { payForProduct } from "../../services/paymentService";
+import { isMockPaymentMode, payForProduct } from "../../services/paymentService";
 import { getUserProfileById } from "../../services/userService";
 import { User } from "../../types/marketplace";
 
@@ -42,6 +42,10 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [paymentFeedback, setPaymentFeedback] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
   const { status, failureReason } = usePaymentStatus(paymentId);
 
   useEffect(() => {
@@ -93,7 +97,13 @@ export default function ProductDetails() {
   };
 
   const handlePurchase = async () => {
+    setPaymentFeedback(null);
+
     if (!product?.id || !product.seller_id) {
+      setPaymentFeedback({
+        type: "error",
+        message: "Payment not successful. Product details are incomplete.",
+      });
       Alert.alert("Purchase Failed", "Product details are incomplete.");
       return;
     }
@@ -108,12 +118,22 @@ export default function ProductDetails() {
         product.seller_id
       );
       setPaymentId(payment.paymentId);
+      setPaymentFeedback({
+        type: "info",
+        message: "Fake STK push sent successfully. Auto-confirming payment...",
+      });
       Alert.alert(
-        "M-Pesa Prompt Sent",
-        "Check your phone and enter your M-Pesa PIN to complete the purchase."
+        isMockPaymentMode() ? "Fake STK Push Sent" : "M-Pesa Prompt Sent",
+        payment.customerMessage ||
+          "Check your phone and enter your M-Pesa PIN to complete the purchase."
       );
     } catch (error: any) {
-      Alert.alert("Purchase Failed", error.message);
+      const message = error.message ?? "Payment was not successful.";
+      setPaymentFeedback({
+        type: "error",
+        message: `Payment not successful. ${message}`,
+      });
+      Alert.alert("Payment Not Successful", message);
     } finally {
       setPaying(false);
     }
@@ -121,17 +141,27 @@ export default function ProductDetails() {
 
   useEffect(() => {
     if (status === "paid") {
+      setPaymentFeedback({
+        type: "success",
+        message: "Payment successful. The product has been marked as sold.",
+      });
       Alert.alert(
-        "Purchase Complete",
-        "Payment received. The product has been marked as sold."
+        "Payment Successful",
+        "The product has been marked as sold."
       );
       setPaymentId(null);
     }
 
     if (status === "failed") {
+      const message =
+        failureReason || "The M-Pesa payment was cancelled or failed.";
+      setPaymentFeedback({
+        type: "error",
+        message: `Payment not successful. ${message}`,
+      });
       Alert.alert(
-        "Payment Failed",
-        failureReason || "The M-Pesa payment was cancelled or failed."
+        "Payment Not Successful",
+        message
       );
       setPaymentId(null);
     }
@@ -180,7 +210,9 @@ export default function ProductDetails() {
           />
           {status === "stk_sent" ? (
             <Text style={styles.statusText}>
-              Waiting for M-Pesa confirmation...
+              {isMockPaymentMode()
+                ? "Fake STK sent. Auto-confirming payment..."
+                : "Waiting for M-Pesa confirmation..."}
             </Text>
           ) : null}
           <CustomButton
@@ -188,6 +220,19 @@ export default function ProductDetails() {
             onPress={handlePurchase}
             loading={paying}
           />
+
+          {paymentFeedback ? (
+            <Text
+              style={[
+                styles.feedback,
+                paymentFeedback.type === "success" && styles.successFeedback,
+                paymentFeedback.type === "error" && styles.errorFeedback,
+                paymentFeedback.type === "info" && styles.infoFeedback,
+              ]}
+            >
+              {paymentFeedback.message}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -246,5 +291,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginTop: 10,
+  },
+  feedback: {
+    borderRadius: 8,
+    fontWeight: "700",
+    marginTop: 12,
+    padding: 10,
+    textAlign: "center",
+  },
+  successFeedback: {
+    backgroundColor: "#E8F8EF",
+    color: Colors.success,
+  },
+  errorFeedback: {
+    backgroundColor: "#FDECEC",
+    color: Colors.danger,
+  },
+  infoFeedback: {
+    backgroundColor: "#EEF4FF",
+    color: Colors.primary,
   },
 });

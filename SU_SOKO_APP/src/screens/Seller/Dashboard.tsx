@@ -31,6 +31,7 @@ const menuItems: Array<{
   { label: "My Products", icon: "cube-outline", route: "MyProducts" },
   { label: "Edit Product", icon: "create-outline", route: "EditProduct" },
   { label: "Messages", icon: "chatbubble-outline", route: "SellerMessages" },
+  { label: "Sales Report", icon: "bar-chart-outline", route: "SellerSalesReport" },
   { label: "Subscription", icon: "card-outline", route: "Subscription" },
   { label: "Profile", icon: "person-outline", route: "SellerProfile" },
   { label: "Sign Out", icon: "log-out-outline", route: "SellerSignOut" },

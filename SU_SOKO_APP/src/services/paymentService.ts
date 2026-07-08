@@ -9,6 +9,10 @@ import {
 import { auth, db } from "../firebase/firebaseConfig";
 
 const MPESA_API_URL = process.env.EXPO_PUBLIC_MPESA_API_URL;
+const PAYMENT_MODE = "mock";
+const MOCK_PAYMENT_DELAY_MS = 2500;
+
+export const isMockPaymentMode = () => PAYMENT_MODE === "mock";
 
 type MpesaPurpose = "seller_subscription" | "product_purchase";
 
@@ -54,13 +58,6 @@ const normalizePhoneNumber = (phoneNumber: string) => {
 
 const initiateMpesaStkPush = async (request: MpesaRequest) => {
   const currentUser = requireCurrentUser();
-
-  if (!MPESA_API_URL) {
-    throw new Error(
-      "M-Pesa backend URL is missing. Set EXPO_PUBLIC_MPESA_API_URL."
-    );
-  }
-
   const normalizedPhone = normalizePhoneNumber(request.phoneNumber);
   const paymentRef = await addDoc(collection(db, "payments"), {
     user_id: currentUser.uid,
@@ -69,10 +66,49 @@ const initiateMpesaStkPush = async (request: MpesaRequest) => {
     purpose: request.purpose,
     product_id: request.productId ?? "",
     seller_id: request.sellerId ?? "",
+    payment_mode: PAYMENT_MODE,
     status: "pending",
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
+
+  if (PAYMENT_MODE === "mock") {
+    await updateDoc(doc(db, "payments", paymentRef.id), {
+      checkout_request_id: `MOCK-${paymentRef.id}`,
+      merchant_request_id: `MOCK-${Date.now()}`,
+      response_description: "Mock STK push accepted",
+      customer_message: "Fake STK push sent successfully.",
+      status: "stk_sent",
+      updated_at: serverTimestamp(),
+    });
+
+    setTimeout(() => {
+      completeMockPayment(paymentRef.id, request, currentUser.uid).catch((error) => {
+        console.log("Mock payment completion failed:", error);
+      });
+    }, MOCK_PAYMENT_DELAY_MS);
+
+    return {
+      paymentId: paymentRef.id,
+      checkoutRequestId: `MOCK-${paymentRef.id}`,
+      merchantRequestId: `MOCK-${Date.now()}`,
+      responseCode: "0",
+      responseDescription: "Mock STK push accepted",
+      customerMessage: "Fake STK push sent successfully.",
+    };
+  }
+
+  if (!MPESA_API_URL) {
+    await updateDoc(doc(db, "payments", paymentRef.id), {
+      status: "failed",
+      failure_reason: "M-Pesa backend URL is missing.",
+      updated_at: serverTimestamp(),
+    });
+
+    throw new Error(
+      "M-Pesa backend URL is missing. Set EXPO_PUBLIC_MPESA_API_URL."
+    );
+  }
 
   const response = await fetch(`${MPESA_API_URL}/mpesa/stk-push`, {
     method: "POST",
@@ -93,6 +129,7 @@ const initiateMpesaStkPush = async (request: MpesaRequest) => {
   if (!response.ok) {
     await updateDoc(doc(db, "payments", paymentRef.id), {
       status: "failed",
+      failure_reason: "M-Pesa backend rejected the request.",
       updated_at: serverTimestamp(),
     });
 
@@ -112,6 +149,37 @@ const initiateMpesaStkPush = async (request: MpesaRequest) => {
     paymentId: paymentRef.id,
     ...data,
   };
+};
+
+const completeMockPayment = async (
+  paymentId: string,
+  request: MpesaRequest,
+  currentUserId: string
+) => {
+  await updateDoc(doc(db, "payments", paymentId), {
+    status: "paid",
+    result_code: 0,
+    result_description: "Mock payment completed successfully.",
+    paid_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+
+  if (request.purpose === "seller_subscription") {
+    await updateDoc(doc(db, "users", currentUserId), {
+      subscription_status: "active",
+      subscription_updated_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
+  }
+
+  if (request.purpose === "product_purchase" && request.productId) {
+    await updateDoc(doc(db, "products", request.productId), {
+      status: "sold",
+      sold_to: currentUserId,
+      sold_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
+  }
 };
 
 export const paySellerSubscription = async (

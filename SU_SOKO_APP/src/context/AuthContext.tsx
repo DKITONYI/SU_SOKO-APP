@@ -60,17 +60,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      setUser(firebaseUser);
       unsubscribeProfile?.();
       unsubscribeProfile = undefined;
+      setLoading(true);
+      setUser(firebaseUser);
+      setProfile(null);
 
       if (!firebaseUser) {
-        setProfile(null);
         setLoading(false);
         return;
       }
-
-      setLoading(true);
 
       unsubscribeProfile = onSnapshot(
         doc(db, "users", firebaseUser.uid),

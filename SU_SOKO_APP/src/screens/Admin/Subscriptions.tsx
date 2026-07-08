@@ -4,28 +4,49 @@ import { Ionicons } from "@expo/vector-icons";
 
 import Colors from "../../constants/Colors";
 import Loading from "../../components/Loading";
-import { getSellerSubscriptions, updateSellerSubscriptionStatus } from "../../services/subscriptionService";
+import {
+  subscribeToSellerSubscriptions,
+  updateSellerSubscriptionStatus,
+} from "../../services/subscriptionService";
 import { User } from "../../types/marketplace";
 import { useBackNavigation } from "../../hooks/useBackNavigation";
+import {
+  subscribeToSubscriptionRevenueReport,
+  SubscriptionRevenueReport,
+} from "../../services/reportingService";
 
 export default function AdminSubscriptions() {
   const goBack = useBackNavigation("AdminDashboard");
   const [sellers, setSellers] = useState<User[]>([]);
+  const [report, setReport] = useState<SubscriptionRevenueReport | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadSellers = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      setSellers(await getSellerSubscriptions());
-    } catch (error: any) {
-      Alert.alert("Subscriptions Failed", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+
+    const unsubscribe = subscribeToSellerSubscriptions(
+      (sellerRecords) => {
+        setSellers(sellerRecords);
+        setLoading(false);
+      },
+      (error) => {
+        Alert.alert("Subscriptions Failed", error.message);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
-    loadSellers();
+    const unsubscribe = subscribeToSubscriptionRevenueReport(
+      setReport,
+      (error) => {
+        Alert.alert("Subscription Report Failed", error.message);
+      }
+    );
+
+    return unsubscribe;
   }, []);
 
   if (loading) return <Loading />;
@@ -39,6 +60,18 @@ export default function AdminSubscriptions() {
 
       <ScrollView>
         <Text style={styles.title}>Seller Subscriptions</Text>
+
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryNumber}>{report?.subscribedSellerCount ?? 0}</Text>
+            <Text style={styles.summaryLabel}>Subscribed Sellers</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryNumber}>KES {report?.totalAmount ?? 0}</Text>
+            <Text style={styles.summaryLabel}>Total Collected</Text>
+          </View>
+        </View>
+
         {sellers.map((seller) => (
           <View key={seller.uid} style={styles.card}>
             <Text style={styles.cardTitle}>{seller.fullName ?? seller.email ?? seller.uid}</Text>
@@ -50,7 +83,6 @@ export default function AdminSubscriptions() {
                   seller.uid,
                   seller.subscription_status === "active" ? "inactive" : "active"
                 );
-                loadSellers();
               }}
             >
               <Text style={styles.buttonText}>
@@ -69,6 +101,10 @@ const styles = StyleSheet.create({
   backButton: { alignItems: "center", flexDirection: "row", gap: 6, marginBottom: 16 },
   backText: { color: Colors.primary, fontWeight: "bold" },
   title: { color: Colors.primary, fontSize: 28, fontWeight: "bold", marginBottom: 16 },
+  summaryRow: { gap: 12, marginBottom: 14 },
+  summaryCard: { backgroundColor: Colors.white, borderRadius: 8, padding: 16, elevation: 3 },
+  summaryNumber: { color: Colors.primary, fontSize: 24, fontWeight: "bold" },
+  summaryLabel: { color: Colors.gray, marginTop: 4 },
   card: { backgroundColor: Colors.white, borderRadius: 8, padding: 16, marginBottom: 12, elevation: 3 },
   cardTitle: { color: Colors.black, fontSize: 17, fontWeight: "bold" },
   text: { color: Colors.gray, marginTop: 6 },
