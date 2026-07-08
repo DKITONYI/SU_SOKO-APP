@@ -1,0 +1,15 @@
+node_modules/
+package.json
+package-lock.json
+
+.env
+*.env
+!*.env.example
+
+proxy/.env
+proxy/venv/
+proxy/__pycache__/
+proxy/serviceAccountKey*.json
+
+SU_SOKO_APP/.env
+functions/.env

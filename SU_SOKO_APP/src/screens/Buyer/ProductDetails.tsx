@@ -19,6 +19,7 @@ import Loading from "../../components/Loading";
 import CustomButton from "../../components/CustomButton";
 import ProductCard from "../../components/ProductCard";
 import { useBackNavigation } from "../../hooks/useBackNavigation";
+import { usePaymentStatus } from "../../hooks/usePaymentStatus";
 import { BuyerStackParamList } from "../../navigation/BuyerNavigator";
 import { getProductById, SellerProduct } from "../../services/productService";
 import { sendMessage } from "../../services/messageService";
@@ -37,9 +38,11 @@ export default function ProductDetails() {
   const [seller, setSeller] = useState<User | null>(null);
   const [message, setMessage] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [paymentId, setPaymentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [paying, setPaying] = useState(false);
+  const { status, failureReason } = usePaymentStatus(paymentId);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -98,12 +101,13 @@ export default function ProductDetails() {
     setPaying(true);
 
     try {
-      await payForProduct(
+      const payment = await payForProduct(
         phoneNumber,
         Number(product.price ?? 0),
         product.id,
         product.seller_id
       );
+      setPaymentId(payment.paymentId);
       Alert.alert(
         "M-Pesa Prompt Sent",
         "Check your phone and enter your M-Pesa PIN to complete the purchase."
@@ -114,6 +118,24 @@ export default function ProductDetails() {
       setPaying(false);
     }
   };
+
+  useEffect(() => {
+    if (status === "paid") {
+      Alert.alert(
+        "Purchase Complete",
+        "Payment received. The product has been marked as sold."
+      );
+      setPaymentId(null);
+    }
+
+    if (status === "failed") {
+      Alert.alert(
+        "Payment Failed",
+        failureReason || "The M-Pesa payment was cancelled or failed."
+      );
+      setPaymentId(null);
+    }
+  }, [failureReason, status]);
 
   if (loading) {
     return <Loading />;
@@ -156,6 +178,11 @@ export default function ProductDetails() {
             onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
           />
+          {status === "stk_sent" ? (
+            <Text style={styles.statusText}>
+              Waiting for M-Pesa confirmation...
+            </Text>
+          ) : null}
           <CustomButton
             title="BUY WITH M-PESA"
             onPress={handlePurchase}
@@ -213,5 +240,11 @@ const styles = StyleSheet.create({
     color: Colors.black,
     minHeight: 48,
     paddingHorizontal: 12,
+  },
+  statusText: {
+    color: Colors.success,
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 10,
   },
 });
