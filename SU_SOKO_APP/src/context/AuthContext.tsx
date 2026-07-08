@@ -81,19 +81,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (profileSnapshot.exists()) {
             const profileData = profileSnapshot.data() as Omit<UserProfile, "uid">;
-            const normalizedRole = normalizeRole(profileData.role);
+            const adminAccount = isAdminEmail(firebaseUser.email ?? "");
+            const normalizedRole = adminAccount
+              ? "admin"
+              : normalizeRole(profileData.role);
             const subscriptionStatus =
-              profileData.subscription_status ??
+              adminAccount
+                ? "active"
+                : profileData.subscription_status ??
               (normalizedRole === "seller" ? "inactive" : "active");
 
             if (
               normalizedRole &&
               (profileData.role !== normalizedRole ||
-                profileData.subscription_status !== subscriptionStatus)
+                profileData.subscription_status !== subscriptionStatus ||
+                (adminAccount && profileData.email !== firebaseUser.email?.toLowerCase()))
             ) {
               setDoc(
                 doc(db, "users", firebaseUser.uid),
                 {
+                  email: adminAccount
+                    ? firebaseUser.email?.toLowerCase() ?? ADMIN_EMAIL
+                    : profileData.email ?? firebaseUser.email?.toLowerCase() ?? "",
                   role: normalizedRole,
                   subscription_status: subscriptionStatus,
                   updated_at: serverTimestamp(),
@@ -111,15 +120,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               subscription_status: subscriptionStatus,
             });
           } else if (isAdminEmail(firebaseUser.email ?? "")) {
+            const adminProfile = {
+              uid: firebaseUser.uid,
+              fullName: "System Admin",
+              email: firebaseUser.email?.toLowerCase() ?? ADMIN_EMAIL,
+              phone: "",
+              role: "admin" as const,
+              subscription_status: "active" as const,
+            };
+
+            setProfile(adminProfile);
+
             setDoc(
               doc(db, "users", firebaseUser.uid),
               {
-                uid: firebaseUser.uid,
-                fullName: "System Admin",
-                email: firebaseUser.email?.toLowerCase() ?? ADMIN_EMAIL,
-                phone: "",
-                role: "admin",
-                subscription_status: "active",
+                ...adminProfile,
                 created_at: serverTimestamp(),
                 updated_at: serverTimestamp(),
               },

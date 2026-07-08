@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import Colors from "../../constants/Colors";
 import Loading from "../../components/Loading";
 import { approveProduct, getPendingProducts, rejectProduct, SellerProduct } from "../../services/productService";
+import { useBackNavigation } from "../../hooks/useBackNavigation";
 
 export default function AdminListings() {
+  const goBack = useBackNavigation("AdminDashboard");
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState("");
@@ -57,6 +60,11 @@ export default function AdminListings() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={goBack}>
+        <Ionicons name="arrow-back" size={20} color={Colors.primary} />
+        <Text style={styles.backText}>Back</Text>
+      </TouchableOpacity>
+
       <ScrollView>
         <Text style={styles.title}>Pending Listings</Text>
         {products.length === 0 ? (
@@ -92,9 +100,11 @@ export default function AdminListings() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, padding: 20 },
+  backButton: { alignItems: "center", flexDirection: "row", gap: 6, marginBottom: 16 },
+  backText: { color: Colors.primary, fontWeight: "bold" },
   title: { color: Colors.primary, fontSize: 28, fontWeight: "bold", marginBottom: 16 },
   empty: { color: Colors.gray },
-  card: { backgroundColor: Colors.white, borderRadius: 12, padding: 16, marginBottom: 12, elevation: 3 },
+  card: { backgroundColor: Colors.white, borderRadius: 8, padding: 16, marginBottom: 12, elevation: 3 },
   cardTitle: { color: Colors.black, fontSize: 18, fontWeight: "bold" },
   text: { color: Colors.gray, marginTop: 4 },
   row: { flexDirection: "row", gap: 10, marginTop: 14 },

@@ -41,8 +41,14 @@ export default function RegisterScreen() {
   const [hidePassword, setHidePassword] = useState(true);
   const [hideConfirmPassword, setHideConfirmPassword] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleRegister = async () => {
+    setFeedback(null);
+
     if (
       isEmpty(
         fullName,
@@ -52,11 +58,13 @@ export default function RegisterScreen() {
         confirmPassword
       )
     ) {
+      setFeedback({ type: "error", message: "Please fill in all the fields." });
       Alert.alert("Missing Information", "Please fill in all the fields.");
       return;
     }
 
     if (!isStrathmoreEmail(email)) {
+      setFeedback({ type: "error", message: "Please use your Strathmore University email address." });
       Alert.alert(
         "Invalid Email",
         "Please use your Strathmore University email address."
@@ -65,6 +73,7 @@ export default function RegisterScreen() {
     }
 
     if (isAdminEmail(email)) {
+      setFeedback({ type: "error", message: "The admin account can only login from the login page." });
       Alert.alert(
         "Admin Login Only",
         "The admin account cannot be created from registration. Please use Login."
@@ -73,6 +82,7 @@ export default function RegisterScreen() {
     }
 
     if (!passwordsMatch(password, confirmPassword)) {
+      setFeedback({ type: "error", message: "Passwords do not match." });
       Alert.alert(
         "Password Error",
         "Passwords do not match."
@@ -90,10 +100,14 @@ export default function RegisterScreen() {
         password,
         role
       );
+      setFeedback({ type: "success", message: "Registration successful. Taking you to your dashboard..." });
+      Alert.alert("Registration Successful", "Taking you to your dashboard.");
     } catch (error: any) {
+      const message = error.message ?? "Something went wrong. Please try again.";
+      setFeedback({ type: "error", message });
       Alert.alert(
         "Registration Failed",
-        error.message
+        message
       );
     } finally {
       setLoading(false);
@@ -220,6 +234,17 @@ export default function RegisterScreen() {
             disabled={loading}
           />
 
+          {feedback && (
+            <Text
+              style={[
+                styles.feedback,
+                feedback.type === "success" ? styles.successFeedback : styles.errorFeedback,
+              ]}
+            >
+              {feedback.message}
+            </Text>
+          )}
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               Already have an account?
@@ -332,6 +357,24 @@ const styles = StyleSheet.create({
 
   selectedRoleText: {
     color: Colors.white,
+  },
+
+  feedback: {
+    borderRadius: 8,
+    fontWeight: "700",
+    marginTop: 12,
+    padding: 10,
+    textAlign: "center",
+  },
+
+  successFeedback: {
+    backgroundColor: "#E8F8EF",
+    color: Colors.success,
+  },
+
+  errorFeedback: {
+    backgroundColor: "#FDECEC",
+    color: Colors.danger,
   },
 
   footer: {

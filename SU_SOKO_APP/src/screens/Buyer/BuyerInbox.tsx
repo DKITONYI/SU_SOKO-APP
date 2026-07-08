@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -13,29 +12,24 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import CustomButton from "../../components/CustomButton";
 import Loading from "../../components/Loading";
 import Colors from "../../constants/Colors";
 import { auth } from "../../firebase/firebaseConfig";
 import { useBackNavigation } from "../../hooks/useBackNavigation";
-import { SellerStackParamList } from "../../navigation/SellerNavigator";
-import {
-  getMessagesForProduct,
-  getMyMessages,
-  sendMessage,
-} from "../../services/messageService";
+import { BuyerStackParamList } from "../../navigation/BuyerNavigator";
+import { getMyMessages } from "../../services/messageService";
 import { getProductById, SellerProduct } from "../../services/productService";
 import { getUserProfileById } from "../../services/userService";
 import { Message, User } from "../../types/marketplace";
 
-type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
+type NavigationProp = NativeStackNavigationProp<BuyerStackParamList>;
 
 type Conversation = {
   key: string;
   productId: string;
-  buyerId: string;
-  buyerName: string;
-  buyerNumber?: string;
+  sellerId: string;
+  sellerName: string;
+  sellerNumber?: string;
   productTitle: string;
   productNumber?: number;
   lastMessage: string;
@@ -45,17 +39,11 @@ type Conversation = {
 
 const getMessageTime = (message: Message) => message.created_at?.toMillis?.() ?? 0;
 
-export default function SellerMessages() {
+export default function BuyerInbox() {
   const navigation = useNavigation<NavigationProp>();
-  const goBack = useBackNavigation("SellerDashboard");
+  const goBack = useBackNavigation("Home");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] =
-    useState<Conversation | null>(null);
-  const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
-  const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
-  const [conversationLoading, setConversationLoading] = useState(false);
-  const [sending, setSending] = useState(false);
 
   const loadInbox = useCallback(async () => {
     setLoading(true);
@@ -69,7 +57,7 @@ export default function SellerMessages() {
 
       const messages = await getMyMessages();
       const productCache = new Map<string, SellerProduct | null>();
-      const buyerCache = new Map<string, User | null>();
+      const sellerCache = new Map<string, User | null>();
       const grouped = new Map<string, Conversation>();
 
       for (const message of messages) {
@@ -79,25 +67,21 @@ export default function SellerMessages() {
         }
 
         const product = productCache.get(message.product_id);
+        const sellerId =
+          product?.seller_id ||
+          (message.sender_id === currentUid ? message.receiver_id : message.sender_id);
 
-        if (product?.seller_id && product.seller_id !== currentUid) {
+        if (!sellerId) {
           continue;
         }
 
-        const buyerId: string =
-          message.sender_id === currentUid ? message.receiver_id : message.sender_id;
-
-        if (!buyerId || buyerId === currentUid) {
-          continue;
+        if (!sellerCache.has(sellerId)) {
+          const seller = await getUserProfileById(sellerId).catch(() => null);
+          sellerCache.set(sellerId, seller);
         }
 
-        if (!buyerCache.has(buyerId)) {
-          const buyer = await getUserProfileById(buyerId).catch(() => null);
-          buyerCache.set(buyerId, buyer);
-        }
-
-        const buyer = buyerCache.get(buyerId);
-        const key = `${message.product_id}:${buyerId}`;
+        const seller = sellerCache.get(sellerId);
+        const key = `${message.product_id}:${sellerId}`;
         const messageTime = getMessageTime(message);
         const existing = grouped.get(key);
         const unreadIncrement =
@@ -107,9 +91,9 @@ export default function SellerMessages() {
           grouped.set(key, {
             key,
             productId: message.product_id,
-            buyerId,
-            buyerName: buyer?.fullName || buyer?.email || "Buyer",
-            buyerNumber: buyer?.user_number,
+            sellerId,
+            sellerName: seller?.fullName || seller?.email || "Seller",
+            sellerNumber: seller?.user_number,
             productTitle: product?.title || "Product",
             productNumber: product?.product_number,
             lastMessage: message.body,
@@ -130,54 +114,11 @@ export default function SellerMessages() {
         )
       );
     } catch (error: any) {
-      Alert.alert("Inbox Failed", error.message ?? "Unable to load messages.");
+      Alert.alert("Inbox Failed", error.message ?? "Unable to load inbox.");
     } finally {
       setLoading(false);
     }
   }, []);
-
-  const openConversation = async (conversation: Conversation) => {
-    setSelectedConversation(conversation);
-    setConversationLoading(true);
-
-    try {
-      const messages = await getMessagesForProduct(conversation.productId);
-      setConversationMessages(
-        messages.filter(
-          (message) =>
-            message.sender_id === conversation.buyerId ||
-            message.receiver_id === conversation.buyerId
-        )
-      );
-    } catch (error: any) {
-      Alert.alert("Chat Failed", error.message ?? "Unable to open chat.");
-    } finally {
-      setConversationLoading(false);
-    }
-  };
-
-  const handleReply = async () => {
-    if (!selectedConversation) {
-      return;
-    }
-
-    setSending(true);
-
-    try {
-      await sendMessage(
-        selectedConversation.productId,
-        selectedConversation.buyerId,
-        reply
-      );
-      setReply("");
-      await openConversation(selectedConversation);
-      await loadInbox();
-    } catch (error: any) {
-      Alert.alert("Reply Failed", error.message);
-    } finally {
-      setSending(false);
-    }
-  };
 
   useFocusEffect(
     useCallback(() => {
@@ -196,38 +137,40 @@ export default function SellerMessages() {
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Messages</Text>
+      <Text style={styles.title}>Inbox</Text>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {conversations.length === 0 ? (
           <View style={styles.card}>
-            <Text style={styles.emptyTitle}>No buyer chats yet</Text>
-            <Text style={styles.emptyText}>Buyer inquiries will appear here.</Text>
+            <Text style={styles.emptyTitle}>No chats yet</Text>
+            <Text style={styles.emptyText}>
+              Open a product and message its seller to start a chat.
+            </Text>
           </View>
         ) : (
           conversations.map((conversation) => (
             <TouchableOpacity
               key={conversation.key}
-              style={[
-                styles.card,
-                selectedConversation?.key === conversation.key && styles.activeCard,
-              ]}
-              onPress={() => openConversation(conversation)}
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate("Chat", {
+                  productId: conversation.productId,
+                  sellerId: conversation.sellerId,
+                })
+              }
             >
               <View style={styles.row}>
                 <View style={styles.iconCircle}>
                   <Ionicons name="person-outline" size={18} color={Colors.primary} />
                 </View>
                 <View style={styles.textBlock}>
-                  <Text style={styles.personName}>
-                    {conversation.buyerName}
-                    {conversation.buyerNumber ? ` #${conversation.buyerNumber}` : ""}
+                  <Text style={styles.sellerName}>
+                    {conversation.sellerName}
+                    {conversation.sellerNumber ? ` #${conversation.sellerNumber}` : ""}
                   </Text>
                   <Text style={styles.productTitle}>
                     {conversation.productTitle}
-                    {conversation.productNumber
-                      ? ` - Product ${conversation.productNumber}`
-                      : ""}
+                    {conversation.productNumber ? ` - Product ${conversation.productNumber}` : ""}
                   </Text>
                 </View>
                 {conversation.unreadCount > 0 ? (
@@ -243,49 +186,6 @@ export default function SellerMessages() {
             </TouchableOpacity>
           ))
         )}
-
-        {selectedConversation ? (
-          <View style={styles.threadCard}>
-            <Text style={styles.threadTitle}>
-              Chat with {selectedConversation.buyerName}
-            </Text>
-
-            {conversationLoading ? (
-              <Loading />
-            ) : (
-              conversationMessages.map((message) => {
-                const mine = message.sender_id === auth.currentUser?.uid;
-
-                return (
-                  <View
-                    key={message.id}
-                    style={[styles.bubble, mine ? styles.mine : styles.theirs]}
-                  >
-                    <Text style={[styles.bubbleMeta, mine && styles.mineMeta]}>
-                      {mine ? "You" : selectedConversation.buyerName}
-                    </Text>
-                    <Text style={[styles.bubbleText, mine && styles.mineText]}>
-                      {message.body}
-                    </Text>
-                  </View>
-                );
-              })
-            )}
-
-            <TextInput
-              style={styles.replyInput}
-              placeholder="Write your reply..."
-              placeholderTextColor={Colors.gray}
-              value={reply}
-              onChangeText={setReply}
-            />
-            <CustomButton
-              title="SEND REPLY"
-              onPress={handleReply}
-              loading={sending}
-            />
-          </View>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -309,7 +209,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 16,
   },
-  activeCard: { borderColor: Colors.primary, borderWidth: 1 },
   row: { alignItems: "center", flexDirection: "row", gap: 10 },
   iconCircle: {
     alignItems: "center",
@@ -320,7 +219,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   textBlock: { flex: 1 },
-  personName: { color: Colors.black, fontSize: 16, fontWeight: "bold" },
+  sellerName: { color: Colors.black, fontSize: 16, fontWeight: "bold" },
   productTitle: { color: Colors.gray, fontSize: 13, marginTop: 2 },
   preview: { color: Colors.black, fontSize: 14, marginTop: 10 },
   badge: {
@@ -334,33 +233,4 @@ const styles = StyleSheet.create({
   badgeText: { color: Colors.white, fontSize: 12, fontWeight: "bold" },
   emptyTitle: { color: Colors.black, fontSize: 17, fontWeight: "bold" },
   emptyText: { color: Colors.gray, marginTop: 6 },
-  threadCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 8,
-    elevation: 3,
-    marginTop: 4,
-    padding: 16,
-  },
-  threadTitle: {
-    color: Colors.primary,
-    fontSize: 17,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  bubble: { borderRadius: 12, marginBottom: 10, maxWidth: "88%", padding: 12 },
-  mine: { alignSelf: "flex-end", backgroundColor: Colors.primary },
-  theirs: { alignSelf: "flex-start", backgroundColor: Colors.background },
-  bubbleMeta: { color: Colors.gray, fontSize: 12, marginBottom: 4 },
-  bubbleText: { color: Colors.black },
-  mineMeta: { color: Colors.lightGray },
-  mineText: { color: Colors.white },
-  replyInput: {
-    borderColor: Colors.lightGray,
-    borderRadius: 10,
-    borderWidth: 1,
-    color: Colors.black,
-    minHeight: 48,
-    marginTop: 8,
-    paddingHorizontal: 12,
-  },
 });

@@ -28,7 +28,7 @@ const menuItems: Array<{
 }> = [
   { label: "Dashboard", icon: "grid-outline", route: "Home" },
   { label: "Browse", icon: "search-outline", route: "Search" },
-  { label: "Messages", icon: "chatbubble-outline", route: "Chat" },
+  { label: "Messages", icon: "chatbubble-outline", route: "BuyerInbox" },
   { label: "Feedback", icon: "star-outline", route: "Feedback" },
   { label: "Profile", icon: "person-outline", route: "Profile" },
   { label: "Sign Out", icon: "log-out-outline", route: "BuyerSignOut" },

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,9 +11,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase/firebaseConfig";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
@@ -35,8 +38,77 @@ const menuItems: Array<{
 
 export default function SellerDashboard() {
   const navigation = useNavigation<NavigationProp>();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const [activeProductCount, setActiveProductCount] = useState(0);
+  const [countLoading, setCountLoading] = useState(true);
+  const [countError, setCountError] = useState("");
+  const [messageCount, setMessageCount] = useState(0);
+  const [messageCountLoading, setMessageCountLoading] = useState(true);
+  const [messageCountError, setMessageCountError] = useState("");
   const firstName = profile?.fullName?.split(" ")[0] || "Seller";
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setActiveProductCount(0);
+      setCountLoading(false);
+      return;
+    }
+
+    setCountLoading(true);
+    setCountError("");
+
+    const productsQuery = query(
+      collection(db, "products"),
+      where("seller_id", "==", user.uid),
+      where("status", "==", "active")
+    );
+
+    const unsubscribe = onSnapshot(
+      productsQuery,
+      (snapshot) => {
+        setActiveProductCount(snapshot.size);
+        setCountLoading(false);
+      },
+      (error) => {
+        console.log("Failed to load active product count:", error);
+        setCountError("Unable to load products");
+        setCountLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setMessageCount(0);
+      setMessageCountLoading(false);
+      return;
+    }
+
+    setMessageCountLoading(true);
+    setMessageCountError("");
+
+    const messagesQuery = query(
+      collection(db, "messages"),
+      where("receiver_id", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (snapshot) => {
+        setMessageCount(snapshot.size);
+        setMessageCountLoading(false);
+      },
+      (error) => {
+        console.log("Failed to load received message count:", error);
+        setMessageCountError("Unable to load messages");
+        setMessageCountLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [user?.uid]);
 
   const goTo = (route: MenuRoute) => {
     navigation.navigate(route as never);
@@ -72,19 +144,28 @@ export default function SellerDashboard() {
 
           <View style={styles.statsGrid}>
             <View style={styles.card}>
-              <Text style={styles.number}>0</Text>
-              <Text style={styles.label}>Products Listed</Text>
-            </View>
+              {countLoading ? (
+                <ActivityIndicator color={Colors.primary} />
+              ) : (
+                <Text style={styles.number}>{activeProductCount}</Text>
+              )}
+              <Text style={styles.label}>Active Products</Text>
+              {countError ? <Text style={styles.errorText}>{countError}</Text> : null}
+             </View>
 
             <View style={styles.card}>
-              <Text style={styles.number}>0</Text>
+              {messageCountLoading ? (
+                <ActivityIndicator color={Colors.primary} />
+              ) : (
+                <Text style={styles.number}>{messageCount}</Text>
+              )}
               <Text style={styles.label}>Messages</Text>
+              {messageCountError ? (
+                <Text style={styles.errorText}>{messageCountError}</Text>
+              ) : null}
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.number}>0</Text>
-              <Text style={styles.label}>Saved by Buyers</Text>
-            </View>
+            
           </View>
 
           <View style={styles.infoCard}>
@@ -176,6 +257,12 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     fontSize: 15,
     marginTop: 4,
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 6,
   },
   infoCard: {
     backgroundColor: Colors.white,

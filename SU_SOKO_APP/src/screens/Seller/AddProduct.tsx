@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { doc, getDoc } from "firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
@@ -21,7 +23,7 @@ import Colors from "../../constants/Colors";
 import Loading from "../../components/Loading";
 import { auth, db } from "../../firebase/firebaseConfig";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
-import { addProduct, uploadProductImage } from "../../services/productService";
+import { addProduct } from "../../services/productService";
 import {
   Category,
   PRODUCT_CATEGORIES,
@@ -29,6 +31,47 @@ import {
 } from "../../types/marketplace";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
+
+const saveProductImageLocally = async (sourceUri: string) => {
+  if (Platform.OS === "web") {
+    return {
+      imageUrl: sourceUri,
+      directoryUri: "browser session image URI",
+    };
+  }
+
+  if (!FileSystem.documentDirectory) {
+    throw new Error("Local file storage is not available on this device.");
+  }
+
+  const directoryUri = `${FileSystem.documentDirectory}product-images/`;
+  const directoryInfo = await FileSystem.getInfoAsync(directoryUri);
+
+  if (!directoryInfo.exists) {
+    await FileSystem.makeDirectoryAsync(directoryUri, { intermediates: true });
+  }
+
+  const cleanUri = sourceUri.split("?")[0];
+  const extension = cleanUri.includes(".")
+    ? cleanUri.split(".").pop()?.toLowerCase()
+    : undefined;
+  const safeExtension =
+    extension === "png" || extension === "jpg" || extension === "jpeg"
+      ? extension
+      : "jpg";
+  const currentUserId = auth.currentUser?.uid ?? "seller";
+  const imageUrl = `${directoryUri}${currentUserId}-${Date.now()}.${safeExtension}`;
+
+  await FileSystem.copyAsync({
+    from: sourceUri,
+    to: imageUrl,
+  });
+
+  return {
+    imageUrl,
+    directoryUri,
+  };
+};
 
 export default function AddProduct() {
   const navigation = useNavigation<NavigationProp>();
@@ -41,6 +84,10 @@ export default function AddProduct() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -93,9 +140,11 @@ export default function AddProduct() {
   };
 
   const pickImage = async () => {
+    setFeedback(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
+      setFeedback({ type: "error", message: "Photo access is required to add a product image." });
       Alert.alert("Permission Needed", "Please allow photo access to upload a product image.");
       return;
     }
@@ -113,7 +162,13 @@ export default function AddProduct() {
   };
 
   const handleSave = async () => {
+    setFeedback(null);
+
     if (profile?.subscription_status !== "active") {
+      setFeedback({
+        type: "error",
+        message: "An active subscription is required to list products.",
+      });
       Alert.alert(
         "Account Disabled",
         "An active subscription is required to list products."
@@ -122,6 +177,7 @@ export default function AddProduct() {
     }
 
     if (!title.trim() || !price.trim() || !category || !description.trim()) {
+      setFeedback({ type: "error", message: "Please fill in all product fields." });
       Alert.alert("Missing Details", "Please fill in all product fields.");
       return;
     }
@@ -129,14 +185,32 @@ export default function AddProduct() {
     setLoading(true);
 
     try {
-      const imageUrl = imageUri ? await uploadProductImage(imageUri) : "";
+      console.log("Saving product image locally...");
+      const savedImage = imageUri
+        ? await saveProductImageLocally(imageUri)
+        : { imageUrl: "", directoryUri: "" };
 
-      await addProduct(title, price, category, description, imageUrl);
+      const response = await addProduct(
+        title,
+        price,
+        category,
+        description,
+        savedImage.imageUrl
+      );
+      console.log("Product added successfully:", response);
+      setFeedback({
+        type: "success",
+        message: savedImage.directoryUri
+          ? `Product saved to Firestore. Image saved locally in ${savedImage.directoryUri}`
+          : "Product saved to Firestore.",
+      });
       Alert.alert("Product Submitted", "Your listing has been saved.", [
         { text: "OK", onPress: () => navigation.navigate("MyProducts") },
       ]);
     } catch (error: any) {
-      Alert.alert("Save Failed", error.message);
+      const message = error.message ?? "Product could not be saved. Please try again.";
+      setFeedback({ type: "error", message });
+      Alert.alert("Save Failed", message);
     } finally {
       setLoading(false);
     }
@@ -246,6 +320,18 @@ export default function AddProduct() {
             onPress={handleSave}
             loading={loading}
           />
+
+          {feedback && (
+            <Text
+              style={[
+                styles.feedback,
+                feedback.type === "success" ? styles.successFeedback : styles.errorFeedback,
+              ]}
+            >
+              {feedback.message}
+            </Text>
+          )}
+
           <CustomButton
             title="BACK"
             onPress={goBack}
@@ -325,6 +411,21 @@ const styles = StyleSheet.create({
   },
   selectedCategoryText: {
     color: Colors.white,
+  },
+  feedback: {
+    borderRadius: 8,
+    fontWeight: "700",
+    marginTop: 12,
+    padding: 10,
+    textAlign: "center",
+  },
+  successFeedback: {
+    backgroundColor: "#E8F8EF",
+    color: Colors.success,
+  },
+  errorFeedback: {
+    backgroundColor: "#FDECEC",
+    color: Colors.danger,
   },
   blockCard: {
     alignItems: "center",

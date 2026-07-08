@@ -45,7 +45,7 @@ export default function ChatScreen() {
       return;
     }
 
-    navigation.navigate("Home");
+    navigation.navigate("BuyerInbox");
   };
 
   const loadMessages = async () => {

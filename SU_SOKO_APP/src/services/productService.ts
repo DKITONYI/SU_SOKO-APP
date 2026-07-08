@@ -10,13 +10,9 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import {
-  getDownloadURL,
-  ref,
-  uploadBytes,
-} from "firebase/storage";
 
-import { auth, db, storage } from "../firebase/firebaseConfig";
+import { auth, db } from "../firebase/firebaseConfig";
+import { getNextProductNumber } from "./idService";
 import {
   Category,
   CreateProductListingInput,
@@ -66,6 +62,11 @@ export const createProductListing = async (
     );
   }
 
+  const productNumber = await getNextProductNumber().catch((error) => {
+    console.log("Failed to allocate product number:", error);
+    return null;
+  });
+
   return addDoc(collection(db, "products"), {
     title: title.trim(),
     price: Number(price ?? 0),
@@ -73,6 +74,7 @@ export const createProductListing = async (
     description: description?.trim() ?? "",
     imageUrl: imageUrl ?? "",
     seller_id: currentUser.uid,
+    ...(productNumber ? { product_number: productNumber } : {}),
     status: "pending" satisfies ProductStatus,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
@@ -93,25 +95,6 @@ export const addProduct = async (
     description,
     imageUrl,
   });
-};
-
-export const uploadProductImage = async (imageUri: string) => {
-  const currentUser = auth.currentUser;
-
-  if (!currentUser) {
-    throw new Error("User not logged in.");
-  }
-
-  const response = await fetch(imageUri);
-  const blob = await response.blob();
-  const imageRef = ref(
-    storage,
-    `products/${currentUser.uid}/${Date.now()}.jpg`
-  );
-
-  await uploadBytes(imageRef, blob);
-
-  return getDownloadURL(imageRef);
 };
 
 export type SellerProduct = Partial<Product> & { id: string };

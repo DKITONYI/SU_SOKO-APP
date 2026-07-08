@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import Colors from "../../constants/Colors";
 import Loading from "../../components/Loading";
 import { getSellerSubscriptions, updateSellerSubscriptionStatus } from "../../services/subscriptionService";
 import { User } from "../../types/marketplace";
+import { useBackNavigation } from "../../hooks/useBackNavigation";
 
 export default function AdminSubscriptions() {
+  const goBack = useBackNavigation("AdminDashboard");
   const [sellers, setSellers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,6 +32,11 @@ export default function AdminSubscriptions() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={goBack}>
+        <Ionicons name="arrow-back" size={20} color={Colors.primary} />
+        <Text style={styles.backText}>Back</Text>
+      </TouchableOpacity>
+
       <ScrollView>
         <Text style={styles.title}>Seller Subscriptions</Text>
         {sellers.map((seller) => (
@@ -58,8 +66,10 @@ export default function AdminSubscriptions() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, padding: 20 },
+  backButton: { alignItems: "center", flexDirection: "row", gap: 6, marginBottom: 16 },
+  backText: { color: Colors.primary, fontWeight: "bold" },
   title: { color: Colors.primary, fontSize: 28, fontWeight: "bold", marginBottom: 16 },
-  card: { backgroundColor: Colors.white, borderRadius: 12, padding: 16, marginBottom: 12, elevation: 3 },
+  card: { backgroundColor: Colors.white, borderRadius: 8, padding: 16, marginBottom: 12, elevation: 3 },
   cardTitle: { color: Colors.black, fontSize: 17, fontWeight: "bold" },
   text: { color: Colors.gray, marginTop: 6 },
   button: { backgroundColor: Colors.primary, borderRadius: 10, padding: 12, marginTop: 12, alignItems: "center" },

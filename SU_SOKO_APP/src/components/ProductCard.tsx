@@ -25,12 +25,20 @@ export default function ProductCard({
       ) : null}
 
       <Text style={styles.title}>{product.title}</Text>
+      {product.product_number ? (
+        <Text style={styles.displayId}>Product {product.product_number}</Text>
+      ) : null}
       <Text style={styles.meta}>{product.category?.replace("_", " ")}</Text>
       <Text style={styles.price}>KES {product.price ?? 0}</Text>
 
       {seller ? (
         <View style={styles.contactBox}>
           <Text style={styles.contactTitle}>Seller Contact</Text>
+          {seller.user_number ? (
+            <Text selectable style={styles.contactText}>
+              Seller #{seller.user_number}
+            </Text>
+          ) : null}
           <Text selectable style={styles.contactText}>
             {seller.phone || "No phone provided"}
           </Text>
@@ -72,6 +80,12 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     marginTop: 4,
     textTransform: "capitalize",
+  },
+  displayId: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 4,
   },
   price: {
     color: Colors.primary,

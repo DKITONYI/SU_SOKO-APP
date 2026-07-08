@@ -28,6 +28,7 @@ export interface User {
   uid: string;
   role: UserRole;
   subscription_status: SubscriptionStatus;
+  user_number?: string;
   fullName?: string;
   email?: string;
   phone?: string;
@@ -44,6 +45,7 @@ export interface Product {
   description?: string;
   imageUrl?: string;
   price?: number;
+  product_number?: number;
   updated_at?: Timestamp;
 }
 

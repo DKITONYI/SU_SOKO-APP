@@ -60,14 +60,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleLogin = async () => {
+    setFeedback(null);
+
     if (isEmpty(email) || isEmpty(password)) {
+      setFeedback({ type: "error", message: "Please enter both email and password." });
       Alert.alert("Missing Fields", "Please enter both email and password.");
       return;
     }
 
     if (!isStrathmoreEmail(email)) {
+      setFeedback({ type: "error", message: "Please use your Strathmore email address." });
       Alert.alert("Invalid Email", "Please use your Strathmore email address.");
       return;
     }
@@ -76,12 +84,16 @@ export default function LoginScreen() {
     try {
       const user = await loginUser(email, password);
       console.log("Login success:", user?.uid);
+      setFeedback({ type: "success", message: "Login successful. Taking you to your dashboard..." });
+      Alert.alert("Login Successful", "Taking you to your dashboard.");
       // No navigation call here on purpose — if your root navigator
       // uses onAuthStateChanged to switch between Auth/App stacks,
       // it will redirect automatically once Firebase confirms the session.
     } catch (error: any) {
       console.log("Login error:", error.code, error.message);
-      Alert.alert("Login Failed", getLoginErrorMessage(error));
+      const message = getLoginErrorMessage(error);
+      setFeedback({ type: "error", message });
+      Alert.alert("Login Failed", message);
     } finally {
       setLoading(false);
     }
@@ -138,6 +150,17 @@ export default function LoginScreen() {
           onPress={handleLogin}
           disabled={loading}
         />
+
+        {feedback && (
+          <Text
+            style={[
+              styles.feedback,
+              feedback.type === "success" ? styles.successFeedback : styles.errorFeedback,
+            ]}
+          >
+            {feedback.message}
+          </Text>
+        )}
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
@@ -211,6 +234,24 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginTop: -5,
     fontWeight: "600",
+  },
+
+  feedback: {
+    borderRadius: 8,
+    fontWeight: "700",
+    marginTop: 12,
+    padding: 10,
+    textAlign: "center",
+  },
+
+  successFeedback: {
+    backgroundColor: "#E8F8EF",
+    color: Colors.success,
+  },
+
+  errorFeedback: {
+    backgroundColor: "#FDECEC",
+    color: Colors.danger,
   },
 
   footer: {
