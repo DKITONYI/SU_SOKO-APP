@@ -1,29 +1,17 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import SellerDashboard from "../screens/Seller/Dashboard";
 
-import AuthNavigator from "./AuthNavigator";
-import BuyerNavigator from "./BuyerNavigator";
-import SellerNavigator from "./SellerNavigator";
+export type SellerStackParamList = {
+  SellerDashboard: undefined;
+};
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<SellerStackParamList>();
 
-export default function AppNavigator() {
+export default function SellerNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen
-        name="Auth"
-        component={AuthNavigator}
-      />
-
-      <Stack.Screen
-        name="Buyer"
-        component={BuyerNavigator}
-      />
-
-      <Stack.Screen
-        name="Seller"
-        component={SellerNavigator}
-      />
+      <Stack.Screen name="SellerDashboard" component={SellerDashboard} />
     </Stack.Navigator>
   );
 }

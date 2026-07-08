@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 
-
 import { loginUser } from "../../services/authService";
 
 import {
@@ -27,75 +26,59 @@ import CustomButton from "../../components/CustomButton";
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
+const getFriendlyErrorMessage = (errorCode: string) => {
+  switch (errorCode) {
+    case "auth/invalid-email":
+      return "That email address looks invalid.";
+    case "auth/user-not-found":
+      return "No account found with that email.";
+    case "auth/wrong-password":
+      return "Incorrect password. Please try again.";
+    case "auth/invalid-credential":
+      return "Incorrect email or password.";
+    case "auth/too-many-requests":
+      return "Too many failed attempts. Please try again later.";
+    case "auth/network-request-failed":
+      return "Network error. Check your internet connection.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
+};
+
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
-const handleLogin = async () => {
-  try {
-    // Check empty fields
-    if (isEmpty(email, password)) {
-      Alert.alert(
-        "Missing Information",
-        "Please enter your email and password."
-      );
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (isEmpty(email) || isEmpty(password)) {
+      Alert.alert("Missing Fields", "Please enter both email and password.");
       return;
     }
 
-    // Validate Strathmore email
     if (!isStrathmoreEmail(email)) {
-      Alert.alert(
-        "Invalid Email",
-        "Please use your Strathmore University email."
-      );
+      Alert.alert("Invalid Email", "Please use your Strathmore email address.");
       return;
     }
 
-    // Login
-   const { firebaseUser, profile } = await loginUser(
-  email.trim(),
-  password
-);
+    setLoading(true);
+    try {
+      const user = await loginUser(email, password);
+      console.log("Login success:", user?.uid);
+      // No navigation call here on purpose — if your root navigator
+      // uses onAuthStateChanged to switch between Auth/App stacks,
+      // it will redirect automatically once Firebase confirms the session.
+    } catch (error: any) {
+      console.log("Login error:", error.code, error.message);
+      Alert.alert("Login Failed", getFriendlyErrorMessage(error.code));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-console.log("Firebase User:", firebaseUser.uid);
-console.log("Profile:", profile);
-
-Alert.alert(
-  "Debug",
-  JSON.stringify(profile)
-);
-    // Navigate based on role
- switch (profile?.role) {
-  case "Buyer":
-    navigation.getParent()?.navigate("Buyer" as never);
-    break;
-
-  case "Seller":
-    navigation.getParent()?.navigate("Seller" as never);
-    break;
-
-  case "Admin":
-    navigation.getParent()?.navigate("Admin" as never);
-    break;
-
-  default:
-    Alert.alert(
-      "Error",
-      "User role not recognized."
-    );
-    break;
-}
-
-  } catch (error: any) {
-    Alert.alert(
-      "Login Failed",
-      error.message
-    );
-  }
-};
- 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -143,8 +126,9 @@ Alert.alert(
         </TouchableOpacity>
 
         <CustomButton
-          title="LOGIN"
+          title={loading ? "LOGGING IN..." : "LOGIN"}
           onPress={handleLogin}
+          disabled={loading}
         />
 
         <View style={styles.footer}>
