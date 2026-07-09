@@ -1,9 +1,11 @@
 import {
   addDoc,
   collection,
+  doc,
   getDocs,
   query,
   serverTimestamp,
+  writeBatch,
   where,
 } from "firebase/firestore";
 
@@ -100,4 +102,77 @@ export const getMessagesForProduct = async (
 
       return firstTime - secondTime;
     });
+};
+
+export const getMessagesForConversation = async (
+  productId: string,
+  otherUserId: string
+): Promise<Message[]> => {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error("User not logged in.");
+  }
+
+  if (!productId.trim()) {
+    throw new Error("Product ID is required.");
+  }
+
+  if (!otherUserId.trim()) {
+    throw new Error("Other user ID is required.");
+  }
+
+  const snapshot = await getDocs(
+    query(collection(db, "messages"), where("product_id", "==", productId.trim()))
+  );
+
+  return snapshot.docs
+    .map((messageDoc) => ({
+      id: messageDoc.id,
+      ...(messageDoc.data() as Omit<Message, "id">),
+    }))
+    .filter(
+      (message) =>
+        (message.sender_id === currentUser.uid && message.receiver_id === otherUserId.trim()) ||
+        (message.sender_id === otherUserId.trim() && message.receiver_id === currentUser.uid)
+    )
+    .sort((first, second) => {
+      const firstTime = first.created_at?.toMillis?.() ?? 0;
+      const secondTime = second.created_at?.toMillis?.() ?? 0;
+
+      return firstTime - secondTime;
+    });
+};
+
+export const markConversationAsRead = async (
+  productId: string,
+  otherUserId: string
+) => {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error("User not logged in.");
+  }
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, "messages"),
+      where("product_id", "==", productId.trim()),
+      where("sender_id", "==", otherUserId.trim()),
+      where("receiver_id", "==", currentUser.uid),
+      where("read", "==", false)
+    )
+  );
+
+  if (snapshot.empty) {
+    return;
+  }
+
+  const batch = writeBatch(db);
+
+  snapshot.docs.forEach((messageDoc) => {
+    batch.update(doc(db, "messages", messageDoc.id), { read: true });
+  });
+
+  await batch.commit();
 };

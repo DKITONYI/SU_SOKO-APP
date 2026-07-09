@@ -17,6 +17,8 @@ import Colors from "../../constants/Colors";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase/firebaseConfig";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
+import { getRatingLabel, getSellerReviews } from "../../services/reviewService";
+import { ProductReview } from "../../types/marketplace";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
 type MenuRoute = keyof SellerStackParamList;
@@ -46,6 +48,9 @@ export default function SellerDashboard() {
   const [messageCount, setMessageCount] = useState(0);
   const [messageCountLoading, setMessageCountLoading] = useState(true);
   const [messageCountError, setMessageCountError] = useState("");
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
   const firstName = profile?.fullName?.split(" ")[0] || "Seller";
 
   useEffect(() => {
@@ -111,6 +116,29 @@ export default function SellerDashboard() {
     return unsubscribe;
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!user?.uid) {
+      setReviews([]);
+      setReviewsLoading(false);
+      return;
+    }
+
+    setReviewsLoading(true);
+    setReviewsError("");
+
+    getSellerReviews()
+      .then((sellerReviews) => {
+        setReviews(sellerReviews.slice(0, 3));
+      })
+      .catch((error) => {
+        console.log("Failed to load seller reviews:", error);
+        setReviewsError("Unable to load feedback");
+      })
+      .finally(() => {
+        setReviewsLoading(false);
+      });
+  }, [user?.uid]);
+
   const goTo = (route: MenuRoute) => {
     navigation.navigate(route as never);
   };
@@ -174,6 +202,26 @@ export default function SellerDashboard() {
             <Text style={styles.infoText}>
               Use the sidebar to add listings, manage products, view your profile, and sign out.
             </Text>
+          </View>
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Recent Product Feedback</Text>
+            {reviewsLoading ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : reviewsError ? (
+              <Text style={styles.errorText}>{reviewsError}</Text>
+            ) : reviews.length === 0 ? (
+              <Text style={styles.infoText}>No buyer feedback yet.</Text>
+            ) : (
+              reviews.map((review) => (
+                <View key={review.id} style={styles.reviewItem}>
+                  <Text style={styles.reviewProduct}>{review.product_title}</Text>
+                  <Text style={styles.infoText}>
+                    {review.buyer_name ?? "Buyer"} rated {review.rating}/3 - {getRatingLabel(review.rating)}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
         </ScrollView>
       </View>
@@ -281,5 +329,16 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     fontSize: 15,
     marginTop: 6,
+  },
+  reviewItem: {
+    borderTopColor: Colors.lightGray,
+    borderTopWidth: 1,
+    marginTop: 10,
+    paddingTop: 10,
+  },
+  reviewProduct: {
+    color: Colors.black,
+    fontSize: 15,
+    fontWeight: "bold",
   },
 });

@@ -20,8 +20,9 @@ import { auth } from "../../firebase/firebaseConfig";
 import { useBackNavigation } from "../../hooks/useBackNavigation";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
 import {
-  getMessagesForProduct,
+  getMessagesForConversation,
   getMyMessages,
+  markConversationAsRead,
   sendMessage,
 } from "../../services/messageService";
 import { getProductById, SellerProduct } from "../../services/productService";
@@ -141,14 +142,12 @@ export default function SellerMessages() {
     setConversationLoading(true);
 
     try {
-      const messages = await getMessagesForProduct(conversation.productId);
+      await markConversationAsRead(conversation.productId, conversation.buyerId);
       setConversationMessages(
-        messages.filter(
-          (message) =>
-            message.sender_id === conversation.buyerId ||
-            message.receiver_id === conversation.buyerId
-        )
+        await getMessagesForConversation(conversation.productId, conversation.buyerId)
       );
+      setSelectedConversation({ ...conversation, unreadCount: 0 });
+      await loadInbox();
     } catch (error: any) {
       Alert.alert("Chat Failed", error.message ?? "Unable to open chat.");
     } finally {
@@ -170,7 +169,7 @@ export default function SellerMessages() {
         reply
       );
       setReply("");
-      await openConversation(selectedConversation);
+      await openConversation({ ...selectedConversation, unreadCount: 0 });
       await loadInbox();
     } catch (error: any) {
       Alert.alert("Reply Failed", error.message);

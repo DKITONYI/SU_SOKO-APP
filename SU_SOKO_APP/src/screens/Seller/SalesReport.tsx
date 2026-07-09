@@ -77,8 +77,7 @@ export default function SellerSalesReport() {
             <View key={item.id} style={styles.card}>
               <Text style={styles.cardTitle}>{item.product_title}</Text>
               <Text style={styles.text}>Amount: KES {item.amount}</Text>
-              <Text style={styles.text}>Product ID: {item.product_id}</Text>
-              <Text style={styles.text}>Buyer ID: {item.buyer_id}</Text>
+              <Text style={styles.text}>Buyer: {item.buyer_name}</Text>
             </View>
           ))
         )}

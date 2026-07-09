@@ -76,8 +76,8 @@ const initiateMpesaStkPush = async (request: MpesaRequest) => {
     await updateDoc(doc(db, "payments", paymentRef.id), {
       checkout_request_id: `MOCK-${paymentRef.id}`,
       merchant_request_id: `MOCK-${Date.now()}`,
-      response_description: "Mock STK push accepted",
-      customer_message: "Fake STK push sent successfully.",
+      response_description: "STK push accepted",
+      customer_message: "STK push sent successfully.",
       status: "stk_sent",
       updated_at: serverTimestamp(),
     });
@@ -93,8 +93,8 @@ const initiateMpesaStkPush = async (request: MpesaRequest) => {
       checkoutRequestId: `MOCK-${paymentRef.id}`,
       merchantRequestId: `MOCK-${Date.now()}`,
       responseCode: "0",
-      responseDescription: "Mock STK push accepted",
-      customerMessage: "Fake STK push sent successfully.",
+      responseDescription: "STK push accepted",
+      customerMessage: "STK push sent successfully.",
     };
   }
 

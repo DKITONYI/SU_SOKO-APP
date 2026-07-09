@@ -9,11 +9,13 @@ import {
 
 import { auth, db } from "../firebase/firebaseConfig";
 import { getProductById } from "./productService";
+import { getUserProfileById } from "./userService";
 
 export type SellerSaleReportItem = {
   id: string;
   amount: number;
   buyer_id: string;
+  buyer_name: string;
   product_id: string;
   product_title: string;
   paid_at?: Timestamp;
@@ -53,13 +55,18 @@ export const getSellerSalesReport = async (): Promise<SellerSaleReport> => {
       const product = productId
         ? await getProductById(productId).catch(() => null)
         : null;
+      const buyerId = String(payment.user_id ?? "");
+      const buyer = buyerId
+        ? await getUserProfileById(buyerId).catch(() => null)
+        : null;
 
       return {
         id: paymentDoc.id,
         amount: Number(payment.amount ?? 0),
-        buyer_id: String(payment.user_id ?? ""),
+        buyer_id: buyerId,
+        buyer_name: buyer?.fullName || buyer?.email || "Buyer",
         product_id: productId,
-        product_title: product?.title ?? "Product",
+        product_title: product?.title ?? String(payment.product_title ?? "Product"),
         paid_at: payment.paid_at,
       };
     })
@@ -128,13 +135,18 @@ export const subscribeToSellerSalesReport = (
           const product = productId
             ? await getProductById(productId).catch(() => null)
             : null;
+          const buyerId = String(payment.user_id ?? "");
+          const buyer = buyerId
+            ? await getUserProfileById(buyerId).catch(() => null)
+            : null;
 
           return {
             id: paymentDoc.id,
             amount: Number(payment.amount ?? 0),
-            buyer_id: String(payment.user_id ?? ""),
+            buyer_id: buyerId,
+            buyer_name: buyer?.fullName || buyer?.email || "Buyer",
             product_id: productId,
-            product_title: product?.title ?? "Product",
+            product_title: product?.title ?? String(payment.product_title ?? "Product"),
             paid_at: payment.paid_at,
           };
         })

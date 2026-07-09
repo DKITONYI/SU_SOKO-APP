@@ -200,11 +200,9 @@ export default function AddProduct() {
       console.log("Product added successfully:", response);
       setFeedback({
         type: "success",
-        message: savedImage.directoryUri
-          ? `Product saved to Firestore. Image saved locally in ${savedImage.directoryUri}`
-          : "Product saved to Firestore.",
+        message: "Product saved successfully.",
       });
-      Alert.alert("Product Submitted", "Your listing has been saved.", [
+      Alert.alert("Product Saved", "Product saved successfully.", [
         { text: "OK", onPress: () => navigation.navigate("MyProducts") },
       ]);
     } catch (error: any) {

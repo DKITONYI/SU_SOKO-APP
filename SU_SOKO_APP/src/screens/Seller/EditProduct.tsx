@@ -1,7 +1,7 @@
 import React from "react";
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import CustomButton from "../../components/CustomButton";
@@ -9,11 +9,9 @@ import Colors from "../../constants/Colors";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
-type ScreenRoute = RouteProp<SellerStackParamList, "EditProduct">;
 
 export default function EditProduct() {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute<ScreenRoute>();
   const goBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -33,7 +31,7 @@ export default function EditProduct() {
       <View style={styles.card}>
         <Text style={styles.title}>Edit Product</Text>
         <Text style={styles.text}>
-          Product ID: {route.params?.productId ?? "Select an item from My Products"}
+          Select a product from My Products to edit its details.
         </Text>
 
         <CustomButton

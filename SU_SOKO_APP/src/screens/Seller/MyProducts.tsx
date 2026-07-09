@@ -17,12 +17,20 @@ import Colors from "../../constants/Colors";
 import Loading from "../../components/Loading";
 import { SellerStackParamList } from "../../navigation/SellerNavigator";
 import { getMyProducts, SellerProduct } from "../../services/productService";
+import {
+  getRatingLabel,
+  getSellerReviews,
+} from "../../services/reviewService";
+import { ProductReview } from "../../types/marketplace";
 
 type NavigationProp = NativeStackNavigationProp<SellerStackParamList>;
 
 export default function MyProducts() {
   const navigation = useNavigation<NavigationProp>();
   const [products, setProducts] = useState<SellerProduct[]>([]);
+  const [reviewsByProduct, setReviewsByProduct] = useState(
+    new Map<string, ProductReview[]>()
+  );
   const [loading, setLoading] = useState(true);
 
   const goBack = () => {
@@ -38,7 +46,21 @@ export default function MyProducts() {
     setLoading(true);
 
     try {
-      setProducts(await getMyProducts());
+      const [sellerProducts, sellerReviews] = await Promise.all([
+        getMyProducts(),
+        getSellerReviews(),
+      ]);
+      const groupedReviews = new Map<string, ProductReview[]>();
+
+      sellerReviews.forEach((review) => {
+        groupedReviews.set(review.product_id, [
+          ...(groupedReviews.get(review.product_id) ?? []),
+          review,
+        ]);
+      });
+
+      setProducts(sellerProducts);
+      setReviewsByProduct(groupedReviews);
     } catch (error: any) {
       Alert.alert("Products Failed", error.message);
     } finally {
@@ -80,26 +102,50 @@ export default function MyProducts() {
             <Text style={styles.emptyText}>Create your first listing to see it here.</Text>
           </View>
         ) : (
-          products.map((product) => (
-            <View key={product.id} style={styles.productCard}>
-              {product.imageUrl ? (
-                <Image source={{ uri: product.imageUrl }} style={styles.productImage} />
-              ) : null}
-              <Text style={styles.productTitle}>{product.title}</Text>
-              <Text style={styles.productMeta}>{product.category}</Text>
-              <Text style={styles.productPrice}>KES {product.price}</Text>
-              <Text style={styles.status}>Status: {product.status ?? "Pending"}</Text>
+          products.map((product) => {
+            const reviews = reviewsByProduct.get(product.id) ?? [];
+            const averageRating =
+              reviews.length > 0
+                ? reviews.reduce((total, review) => total + review.rating, 0) /
+                  reviews.length
+                : null;
 
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() =>
-                  navigation.navigate("EditProduct", { productId: product.id })
-                }
-              >
-                <Text style={styles.editButtonText}>Edit Product</Text>
-              </TouchableOpacity>
-            </View>
-          ))
+            return (
+              <View key={product.id} style={styles.productCard}>
+                {product.imageUrl ? (
+                  <Image source={{ uri: product.imageUrl }} style={styles.productImage} />
+                ) : null}
+                <Text style={styles.productTitle}>{product.title}</Text>
+                <Text style={styles.productMeta}>{product.category}</Text>
+                <Text style={styles.productPrice}>KES {product.price}</Text>
+                <Text style={styles.status}>Status: {product.status ?? "Pending"}</Text>
+
+                {reviews.length > 0 && averageRating ? (
+                  <View style={styles.reviewBox}>
+                    <Text style={styles.reviewTitle}>
+                      Buyer review: {averageRating.toFixed(1)} / 3
+                    </Text>
+                    {reviews.map((review) => (
+                      <Text key={review.id} style={styles.reviewText}>
+                        {review.buyer_name ?? "Buyer"}: {review.rating} - {getRatingLabel(review.rating)}
+                      </Text>
+                    ))}
+                  </View>
+                ) : product.status === "sold" ? (
+                  <Text style={styles.noReviewText}>No buyer review yet.</Text>
+                ) : null}
+
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() =>
+                    navigation.navigate("EditProduct", { productId: product.id })
+                  }
+                >
+                  <Text style={styles.editButtonText}>Edit Product</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -194,6 +240,24 @@ const styles = StyleSheet.create({
   status: {
     color: Colors.gray,
     marginTop: 6,
+  },
+  reviewBox: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    marginTop: 12,
+    padding: 10,
+  },
+  reviewTitle: {
+    color: Colors.primary,
+    fontWeight: "bold",
+  },
+  reviewText: {
+    color: Colors.black,
+    marginTop: 4,
+  },
+  noReviewText: {
+    color: Colors.gray,
+    marginTop: 10,
   },
   editButton: {
     borderColor: Colors.primary,

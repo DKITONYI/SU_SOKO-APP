@@ -46,6 +46,8 @@ export interface Product {
   imageUrl?: string;
   price?: number;
   product_number?: number;
+  sold_at?: Timestamp;
+  sold_to?: string;
   updated_at?: Timestamp;
 }
 
@@ -60,7 +62,11 @@ export type CreateProductListingInput = {
 export interface Report {
   id: string;
   product_id: string;
+  product_title?: string;
   reporter_id: string;
+  reporter_name?: string;
+  seller_id?: string;
+  seller_name?: string;
   reason: string;
   status: "pending" | "reviewed" | "dismissed";
   created_at: Timestamp;
@@ -74,6 +80,18 @@ export interface Message {
   body: string;
   created_at: Timestamp;
   read: boolean;
+}
+
+export interface ProductReview {
+  id: string;
+  product_id: string;
+  product_title: string;
+  seller_id: string;
+  buyer_id: string;
+  buyer_name?: string;
+  rating: 1 | 2 | 3;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export const isCategory = (value: string): value is Category => {

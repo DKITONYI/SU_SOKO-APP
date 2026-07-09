@@ -120,10 +120,10 @@ export default function ProductDetails() {
       setPaymentId(payment.paymentId);
       setPaymentFeedback({
         type: "info",
-        message: "Fake STK push sent successfully. Auto-confirming payment...",
+        message: "STK push sent successfully. Confirming payment...",
       });
       Alert.alert(
-        isMockPaymentMode() ? "Fake STK Push Sent" : "M-Pesa Prompt Sent",
+        isMockPaymentMode() ? "STK Push Sent" : "M-Pesa Prompt Sent",
         payment.customerMessage ||
           "Check your phone and enter your M-Pesa PIN to complete the purchase."
       );
@@ -211,7 +211,7 @@ export default function ProductDetails() {
           {status === "stk_sent" ? (
             <Text style={styles.statusText}>
               {isMockPaymentMode()
-                ? "Fake STK sent. Auto-confirming payment..."
+                ? "STK sent. Confirming payment..."
                 : "Waiting for M-Pesa confirmation..."}
             </Text>
           ) : null}

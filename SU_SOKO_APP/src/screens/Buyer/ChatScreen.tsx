@@ -19,10 +19,11 @@ import CustomButton from "../../components/CustomButton";
 import { auth } from "../../firebase/firebaseConfig";
 import { BuyerStackParamList } from "../../navigation/BuyerNavigator";
 import {
-  getMessagesForProduct,
-  getMyMessages,
+  getMessagesForConversation,
+  markConversationAsRead,
   sendMessage,
 } from "../../services/messageService";
+import { getUserProfileById } from "../../services/userService";
 import { Message } from "../../types/marketplace";
 
 type NavigationProp = NativeStackNavigationProp<BuyerStackParamList>;
@@ -32,9 +33,7 @@ export default function ChatScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newProductId, setNewProductId] = useState(route.params?.productId ?? "");
-  const [newReceiverId, setNewReceiverId] = useState(route.params?.sellerId ?? "");
-  const [newMessage, setNewMessage] = useState("");
+  const [sellerName, setSellerName] = useState("Seller");
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -52,10 +51,13 @@ export default function ChatScreen() {
     setLoading(true);
 
     try {
-      if (route.params?.productId) {
-        setMessages(await getMessagesForProduct(route.params.productId));
+      if (route.params?.productId && route.params?.sellerId) {
+        await markConversationAsRead(route.params.productId, route.params.sellerId);
+        setMessages(
+          await getMessagesForConversation(route.params.productId, route.params.sellerId)
+        );
       } else {
-        setMessages(await getMyMessages());
+        setMessages([]);
       }
     } catch (error: any) {
       Alert.alert("Messages Failed", error.message);
@@ -66,7 +68,21 @@ export default function ChatScreen() {
 
   useEffect(() => {
     loadMessages();
-  }, [route.params?.productId]);
+  }, [route.params?.productId, route.params?.sellerId]);
+
+  useEffect(() => {
+    const loadSellerName = async () => {
+      if (!route.params?.sellerId) {
+        setSellerName("Seller");
+        return;
+      }
+
+      const seller = await getUserProfileById(route.params.sellerId).catch(() => null);
+      setSellerName(seller?.fullName || seller?.email || "Seller");
+    };
+
+    loadSellerName();
+  }, [route.params?.sellerId]);
 
   const handleReply = async () => {
     const productId = route.params?.productId;
@@ -90,21 +106,6 @@ export default function ChatScreen() {
     }
   };
 
-  const handleStartNewChat = async () => {
-    setSending(true);
-
-    try {
-      await sendMessage(newProductId, newReceiverId, newMessage);
-      setNewMessage("");
-      await loadMessages();
-      Alert.alert("Message Sent", "Your new chat has been started.");
-    } catch (error: any) {
-      Alert.alert("Message Failed", error.message);
-    } finally {
-      setSending(false);
-    }
-  };
-
   if (loading) {
     return <Loading />;
   }
@@ -116,43 +117,17 @@ export default function ChatScreen() {
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Messages</Text>
+      <Text style={styles.title}>{route.params?.sellerId ? sellerName : "Messages"}</Text>
 
-      <View style={styles.startCard}>
-        <Text style={styles.startTitle}>Start New Chat</Text>
-        <TextInput
-          style={styles.replyInput}
-          placeholder="Product ID"
-          placeholderTextColor={Colors.gray}
-          value={newProductId}
-          onChangeText={setNewProductId}
-        />
-        <TextInput
-          style={styles.replyInput}
-          placeholder="Seller user ID"
-          placeholderTextColor={Colors.gray}
-          value={newReceiverId}
-          onChangeText={setNewReceiverId}
-        />
-        <TextInput
-          style={styles.replyInput}
-          placeholder="Message"
-          placeholderTextColor={Colors.gray}
-          value={newMessage}
-          onChangeText={setNewMessage}
-        />
-        <CustomButton
-          title="START CHAT"
-          onPress={handleStartNewChat}
-          loading={sending}
-        />
-      </View>
-
-      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      >
         {messages.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.emptyTitle}>No messages yet</Text>
-            <Text style={styles.emptyText}>Start from a product details page.</Text>
+            <Text style={styles.emptyText}>Open a product or inbox chat to start messaging.</Text>
           </View>
         ) : (
           messages.map((message) => {
@@ -164,7 +139,7 @@ export default function ChatScreen() {
                 style={[styles.bubble, mine ? styles.mine : styles.theirs]}
               >
                 <Text style={[styles.bubbleMeta, mine && styles.mineMeta]}>
-                  {mine ? "You" : "Them"}
+                  {mine ? "You" : sellerName}
                 </Text>
                 <Text style={[styles.bubbleText, mine && styles.mineText]}>
                   {message.body}
@@ -206,9 +181,8 @@ const styles = StyleSheet.create({
   },
   backText: { color: Colors.primary, fontSize: 15, fontWeight: "bold" },
   title: { color: Colors.primary, fontSize: 28, fontWeight: "bold", marginBottom: 14 },
-  startCard: { backgroundColor: Colors.white, borderRadius: 12, elevation: 3, padding: 12, marginBottom: 14 },
-  startTitle: { color: Colors.primary, fontSize: 16, fontWeight: "bold", marginBottom: 8 },
-  list: { flex: 1 },
+  list: { flex: 1, minHeight: 0 },
+  listContent: { paddingBottom: 12 },
   card: { backgroundColor: Colors.white, borderRadius: 12, padding: 18, elevation: 3 },
   emptyTitle: { color: Colors.black, fontSize: 17, fontWeight: "bold" },
   emptyText: { color: Colors.gray, marginTop: 6 },

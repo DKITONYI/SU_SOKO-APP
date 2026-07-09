@@ -76,8 +76,31 @@ service cloud.firestore {
         && validProductBase(request.resource.data);
     }
 
+    function buyerMarksPurchasedProductSold() {
+      return signedIn()
+        && resource.data.status == 'active'
+        && request.resource.data.status == 'sold'
+        && request.resource.data.seller_id == resource.data.seller_id
+        && request.resource.data.sold_to == request.auth.uid
+        && validProductBase(request.resource.data);
+    }
+
+    function isBuyerOfProduct(productId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/products/$(productId))
+        && get(/databases/$(database)/documents/products/$(productId)).data.sold_to == request.auth.uid;
+    }
+
+    function validReview(data) {
+      return data.product_id is string
+        && data.product_title is string
+        && data.seller_id is string
+        && data.buyer_id is string
+        && data.rating in [1, 2, 3];
+    }
+
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if signedIn();
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
@@ -94,17 +117,62 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if signedIn()
         && (resource.data.status == 'active'
+          || resource.data.sold_to == request.auth.uid
           || isAdmin()
           || resource.data.seller_id == request.auth.uid);
 
       allow create: if createsOwnPendingProduct();
 
       allow update: if isAdmin()
-        || updatesOwnProductWithoutApproval();
+        || updatesOwnProductWithoutApproval()
+        || buyerMarksPurchasedProductSold();
 
       allow delete: if isAdmin()
         || (sellerHasActiveSubscription()
           && resource.data.seller_id == request.auth.uid);
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if isAdmin()
+        || resource.data.buyer_id == request.auth.uid
+        || resource.data.seller_id == request.auth.uid;
+
+      allow create, update: if signedIn()
+        && validReview(request.resource.data)
+        && request.resource.data.buyer_id == request.auth.uid
+        && isBuyerOfProduct(request.resource.data.product_id)
+        && request.resource.data.seller_id ==
+          get(/databases/$(database)/documents/products/$(request.resource.data.product_id)).data.seller_id;
+
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAdmin()
+        || resource.data.reporter_id == request.auth.uid
+        || resource.data.seller_id == request.auth.uid;
+
+      allow create: if signedIn()
+        && request.resource.data.reporter_id == request.auth.uid
+        && request.resource.data.product_id is string
+        && request.resource.data.reason is string
+        && request.resource.data.status == 'pending';
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAdmin()
+        || resource.data.user_id == request.auth.uid
+        || resource.data.seller_id == request.auth.uid;
+
+      allow create: if signedIn()
+        && request.resource.data.user_id == request.auth.uid;
+
+      allow update: if isAdmin()
+        || resource.data.user_id == request.auth.uid;
+
+      allow delete: if isAdmin();
     }
   }
 }
